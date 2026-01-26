@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { appConfig } from '@/lib/app-config'
 
 interface SendMailParams {
   to: string
@@ -35,7 +36,7 @@ export async function sendMail({ to, subject, html }: SendMailParams) {
   const from = process.env.EMAIL_FROM || process.env.EMAIL_SERVER_USER
 
   if (!transporter || !from) {
-    console.info('[email:mock]', { to, subject })
+    console.info('[email:mock]', { to, subject, app: appConfig.name })
     return
   }
 

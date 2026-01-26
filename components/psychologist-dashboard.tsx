@@ -36,54 +36,7 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   
-  // Mock data - Em produção viria de um banco de dados
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    {
-      id: '1',
-      patientName: 'João Silva',
-      time: '09:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Paciente apresentou melhora significativa no quadro de ansiedade.',
-      date: new Date(2026, 0, 23),
-    },
-    {
-      id: '2',
-      patientName: 'Maria Santos',
-      time: '10:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Continuar com técnicas de CBT. Trabalhar questões familiares.',
-      date: new Date(2026, 0, 23),
-    },
-    {
-      id: '3',
-      patientName: 'Pedro Oliveira',
-      time: '11:00',
-      duration: '50 min',
-      status: 'in-progress',
-      notes: 'Primeira consulta. Queixa principal: dificuldade de concentração.',
-      date: new Date(2026, 0, 23),
-    },
-    {
-      id: '4',
-      patientName: 'Ana Costa',
-      time: '14:00',
-      duration: '50 min',
-      status: 'upcoming',
-      notes: 'Paciente em tratamento para depressão há 3 meses.',
-      date: new Date(2026, 0, 23),
-    },
-    {
-      id: '5',
-      patientName: 'Carlos Mendes',
-      time: '15:00',
-      duration: '50 min',
-      status: 'upcoming',
-      notes: '',
-      date: new Date(2026, 0, 23),
-    },
-  ])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
 
   const todayAppointments = appointments.filter(
     (apt) => apt.date.toDateString() === selectedDate.toDateString()

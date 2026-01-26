@@ -4,12 +4,17 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _geist = Geist({ subsets: ["latin"] })
+const _geistMono = Geist_Mono({ subsets: ["latin"] })
+
+const appName = process.env.NEXT_PUBLIC_APP_NAME || 'MindCare'
+const appDescription =
+  process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
+  'Conecte-se com psicólogos licenciados através de consultas por vídeo seguras'
 
 export const metadata: Metadata = {
-  title: 'MindCare - Plataforma de Teleatendimento Psicológico',
-  description: 'Conecte-se com psicólogos licenciados através de consultas por vídeo seguras',
+  title: `${appName} - Plataforma de Teleatendimento Psicológico`,
+  description: appDescription,
   generator: 'v0.app',
   icons: {
     icon: [

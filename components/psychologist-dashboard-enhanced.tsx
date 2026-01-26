@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { appConfig } from '@/lib/app-config'
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
 
@@ -53,68 +54,8 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const [newReminderText, setNewReminderText] = useState('')
   const [newReminderColor, setNewReminderColor] = useState<'amber' | 'blue' | 'green' | 'red'>('blue')
   
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    {
-      id: '1',
-      patientName: 'João Silva',
-      time: '09:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Paciente apresentou melhora significativa no quadro de ansiedade.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 98765-4321',
-    },
-    {
-      id: '2',
-      patientName: 'Maria Santos',
-      time: '10:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Continuar com técnicas de CBT. Trabalhar questões familiares.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'email',
-      patientContact: 'maria.santos@email.com',
-    },
-    {
-      id: '3',
-      patientName: 'Pedro Oliveira',
-      time: '11:00',
-      duration: '50 min',
-      status: 'in-progress',
-      notes: 'Primeira consulta. Queixa principal: dificuldade de concentração.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 97654-3210',
-    },
-    {
-      id: '4',
-      patientName: 'Ana Costa',
-      time: '14:00',
-      duration: '50 min',
-      status: 'upcoming',
-      notes: 'Paciente em tratamento para depressão há 3 meses.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 96543-2109',
-    },
-    {
-      id: '5',
-      patientName: 'Carlos Mendes',
-      time: '15:00',
-      duration: '50 min',
-      status: 'cancelled',
-      notes: 'Cancelado pelo paciente - motivo pessoal.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'email',
-      patientContact: 'carlos.mendes@email.com',
-    },
-  ])
-
-  const [reminders, setReminders] = useState<Reminder[]>([
-    { id: '1', text: 'Lembrete: Atualizar prontuário da Ana Costa', color: 'amber' },
-    { id: '2', text: 'Próxima supervisão: Segunda às 10h', color: 'blue' },
-  ])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [reminders, setReminders] = useState<Reminder[]>([])
 
   const todayAppointments = appointments.filter(
     (apt) => apt.date.toDateString() === selectedDate.toDateString()
@@ -145,7 +86,8 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const handleStartCall = (appointment: Appointment) => {
     const preference = appointment.notificationPreference
     const contact = appointment.patientContact
-    const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: https://meet.mindcare.app/${appointment.id}`
+    const baseUrl = appConfig.videoBaseUrl.replace(/\/$/, '')
+    const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${baseUrl}/${appointment.id}`
     
     if (preference === 'whatsapp') {
       alert(`Notificação enviada via WhatsApp para ${contact}\n\nMensagem: ${message}`)

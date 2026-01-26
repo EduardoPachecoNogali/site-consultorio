@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, KeyboardEvent } from 'react'
+import { useCallback, useEffect, useState, KeyboardEvent } from 'react'
 import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, MessageCircle, Check, X, Phone, Stethoscope, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { appConfig } from '@/lib/app-config'
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
 
@@ -68,10 +69,48 @@ interface AppointmentSlot {
 
 interface PsychologistDashboardProps {
   psychologistName: string
+  psychologistId: string
   onLogout: () => void
 }
 
-export function PsychologistDashboard({ psychologistName, onLogout }: PsychologistDashboardProps) {
+type ApiMedicalRecord = Omit<MedicalRecord, 'date'> & { date: string }
+type ApiPatientProfile = Omit<PatientProfile, 'medicalRecords'> & {
+  medicalRecords: ApiMedicalRecord[]
+}
+type ApiAppointment = Omit<Appointment, 'date'> & { date: string }
+type DashboardPayload = {
+  patients: ApiPatientProfile[]
+  appointments: ApiAppointment[]
+  reminders: Reminder[]
+}
+
+const hydrateDashboard = (payload: DashboardPayload) => ({
+  patients: payload.patients.map((patient) => ({
+    ...patient,
+    medicalRecords: patient.medicalRecords.map((record) => ({
+      ...record,
+      date: new Date(record.date),
+    })),
+  })),
+  appointments: payload.appointments.map((appointment) => ({
+    ...appointment,
+    date: new Date(appointment.date),
+  })),
+  reminders: payload.reminders,
+})
+
+const formatDateForApi = (date: Date) => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function PsychologistDashboard({
+  psychologistName,
+  psychologistId,
+  onLogout,
+}: PsychologistDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [searchQuery, setSearchQuery] = useState('')
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
@@ -105,150 +144,44 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const [editingField, setEditingField] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState('')
 
-  const [patientProfiles, setPatientProfiles] = useState<PatientProfile[]>([
-    {
-      id: '1',
-      name: 'João Silva',
-      email: 'joao.silva@email.com',
-      phone: '+55 11 98765-4321',
-      totalAppointments: 8,
-      completedAppointments: 7,
-      upcomingAppointments: 1,
-      medicalRecords: [
-        {
-          id: 'r1',
-          date: new Date(2026, 0, 16),
-          title: 'Primeira Consulta',
-          content: 'Paciente chegou com queixas de ansiedade generalizada. Histórico familiar de transtornos de humor.',
-        },
-        {
-          id: 'r2',
-          date: new Date(2026, 0, 23),
-          title: 'Evolução Positiva',
-          content: 'Paciente relatou melhora significativa após início das técnicas de respiração e mindfulness.',
-        },
-      ],
-      basicInfo: {
-        age: '32 anos',
-        occupation: 'Engenheiro de Software',
-        emergencyContact: '+55 11 91234-5678 (Maria Silva - Esposa)',
-      },
-    },
-    {
-      id: '2',
-      name: 'Maria Santos',
-      email: 'maria.santos@email.com',
-      phone: '+55 11 97654-3210',
-      totalAppointments: 12,
-      completedAppointments: 11,
-      upcomingAppointments: 1,
-      medicalRecords: [
-        {
-          id: 'r3',
-          date: new Date(2025, 11, 10),
-          title: 'Avaliação Inicial',
-          content: 'Paciente apresenta sintomas de depressão moderada. Iniciado tratamento com CBT.',
-        },
-      ],
-      basicInfo: {
-        age: '28 anos',
-        occupation: 'Professora',
-        emergencyContact: '+55 11 99876-5432 (Pedro Santos - Irmão)',
-      },
-    },
-    {
-      id: '3',
-      name: 'Pedro Oliveira',
-      email: 'pedro.oliveira@email.com',
-      phone: '+55 11 96543-2109',
-      totalAppointments: 1,
-      completedAppointments: 0,
-      upcomingAppointments: 1,
-      medicalRecords: [],
-      basicInfo: {
-        age: '24 anos',
-        occupation: 'Estudante',
-      },
-    },
-    {
-      id: '4',
-      name: 'Ana Costa',
-      email: 'ana.costa@email.com',
-      phone: '+55 11 95432-1098',
-      totalAppointments: 5,
-      completedAppointments: 4,
-      upcomingAppointments: 1,
-      medicalRecords: [
-        {
-          id: 'r4',
-          date: new Date(2025, 11, 20),
-          title: 'Tratamento em Andamento',
-          content: 'Paciente em tratamento para depressão há 3 meses. Boa adesão ao tratamento.',
-        },
-      ],
-      basicInfo: {
-        age: '45 anos',
-        occupation: 'Gerente de Vendas',
-        emergencyContact: '+55 11 94321-0987 (Carlos Costa - Esposo)',
-      },
-    },
-  ])
-  
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    {
-      id: '1',
-      patientId: '1',
-      patientName: 'João Silva',
-      time: '09:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Paciente apresentou melhora significativa no quadro de ansiedade.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 98765-4321',
-    },
-    {
-      id: '2',
-      patientId: '2',
-      patientName: 'Maria Santos',
-      time: '10:00',
-      duration: '50 min',
-      status: 'completed',
-      notes: 'Continuar com técnicas de CBT. Trabalhar questões familiares.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'email',
-      patientContact: 'maria.santos@email.com',
-    },
-    {
-      id: '3',
-      patientId: '3',
-      patientName: 'Pedro Oliveira',
-      time: '11:00',
-      duration: '50 min',
-      status: 'in-progress',
-      notes: 'Primeira consulta. Queixa principal: dificuldade de concentração.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 97654-3210',
-    },
-    {
-      id: '4',
-      patientId: '4',
-      patientName: 'Ana Costa',
-      time: '14:00',
-      duration: '50 min',
-      status: 'upcoming',
-      notes: 'Paciente em tratamento para depressão há 3 meses.',
-      date: new Date(2026, 0, 23),
-      notificationPreference: 'whatsapp',
-      patientContact: '+55 11 96543-2109',
-    },
-  ])
+  const [patientProfiles, setPatientProfiles] = useState<PatientProfile[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [reminders, setReminders] = useState<Reminder[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
-  const [reminders, setReminders] = useState<Reminder[]>([
-    { id: '1', text: 'Lembrete: Atualizar prontuário da Ana Costa', color: 'amber' },
-    { id: '2', text: 'Próxima supervisão: Segunda às 10h', color: 'blue' },
-  ])
+  const loadDashboard = useCallback(async () => {
+    if (!psychologistId) return
+    setIsLoading(true)
+    setLoadError('')
+    try {
+      const response = await fetch(`/api/psychologists/${psychologistId}/dashboard`)
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao carregar dados.')
+      }
+      const data = (await response.json()) as DashboardPayload
+      const hydrated = hydrateDashboard(data)
+      setPatientProfiles(hydrated.patients)
+      setAppointments(hydrated.appointments)
+      setReminders(hydrated.reminders)
+      setViewingPatient((current) =>
+        current
+          ? hydrated.patients.find((patient) => patient.id === current.id) ?? null
+          : current,
+      )
+    } catch (error: any) {
+      console.error(error)
+      setLoadError(error.message || 'Erro ao carregar dados.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [psychologistId])
+
+  useEffect(() => {
+    if (!psychologistId) return
+    loadDashboard()
+  }, [psychologistId, loadDashboard])
 
   const todayAppointments = appointments.filter(
     (apt) => apt.date.toDateString() === selectedDate.toDateString()
@@ -258,15 +191,38 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
     apt.patientName.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleSaveAppointment = () => {
-    if (editingAppointment) {
-      setAppointments(
-        appointments.map((apt) =>
-          apt.id === editingAppointment.id ? editingAppointment : apt
-        )
+  const handleSaveAppointment = async () => {
+    if (!editingAppointment || !psychologistId) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/appointments/${editingAppointment.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: formatDateForApi(editingAppointment.date),
+            time: editingAppointment.time,
+            duration: editingAppointment.duration,
+            status: editingAppointment.status,
+            notes: editingAppointment.notes,
+            notificationPreference: editingAppointment.notificationPreference,
+            patientContact: editingAppointment.patientContact,
+          }),
+        },
       )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao atualizar consulta.')
+      }
+
+      await loadDashboard()
       setIsEditDialogOpen(false)
       setEditingAppointment(null)
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao atualizar consulta.')
     }
   }
 
@@ -285,7 +241,9 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
     setAdditionalSlots([])
   }
 
-  const handleAddAppointment = () => {
+  const handleAddAppointment = async () => {
+    if (!psychologistId) return
+
     const normalizedName = newAppointment.patientName.trim()
     const slotsToSchedule: AppointmentSlot[] = []
 
@@ -307,72 +265,72 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
       return
     }
 
-    const newPatientId = Date.now().toString()
+    const patientContact =
+      newAppointment.notificationPreference === 'whatsapp'
+        ? newAppointment.patientPhone
+        : newAppointment.patientEmail
 
-    let existingPatient =
-      patientProfiles.find(
-        (p) => p.name.toLowerCase() === normalizedName.toLowerCase()
-      ) ?? null
-
-    if (!existingPatient) {
-      const newProfile: PatientProfile = {
-        id: newPatientId,
-        name: normalizedName,
-        email: newAppointment.patientEmail,
-        phone: newAppointment.patientPhone,
-        totalAppointments: slotsToSchedule.length,
-        completedAppointments: 0,
-        upcomingAppointments: slotsToSchedule.length,
-        medicalRecords: [],
-        basicInfo: {},
-      }
-      setPatientProfiles([...patientProfiles, newProfile])
-      existingPatient = newProfile
-    } else {
-      setPatientProfiles(
-        patientProfiles.map((p) =>
-          p.id === existingPatient!.id
-            ? {
-                ...p,
-                totalAppointments: p.totalAppointments + slotsToSchedule.length,
-                upcomingAppointments: p.upcomingAppointments + slotsToSchedule.length,
-              }
-            : p
-        )
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/appointments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientName: normalizedName,
+            patientEmail: newAppointment.patientEmail,
+            patientPhone: newAppointment.patientPhone,
+            duration: newAppointment.duration,
+            notes: newAppointment.notes,
+            notificationPreference: newAppointment.notificationPreference,
+            patientContact,
+            slots: slotsToSchedule.map((slot) => ({
+              date: formatDateForApi(slot.date),
+              time: slot.time,
+            })),
+          }),
+        },
       )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao criar consulta.')
+      }
+
+      await loadDashboard()
+      setIsNewAppointmentOpen(false)
+      resetNewAppointmentForm()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao criar consulta.')
     }
-
-    const createdAppointments: Appointment[] = slotsToSchedule.map((slot, index) => ({
-      id: `${Date.now()}-${index}`,
-      patientId: existingPatient!.id,
-      patientName: normalizedName,
-      time: slot.time,
-      duration: newAppointment.duration,
-      status: 'upcoming',
-      notes: newAppointment.notes,
-      date: slot.date,
-      notificationPreference: newAppointment.notificationPreference,
-      patientContact:
-        newAppointment.notificationPreference === 'whatsapp'
-          ? newAppointment.patientPhone
-          : newAppointment.patientEmail,
-    }))
-
-    setAppointments([...appointments, ...createdAppointments])
-    setIsNewAppointmentOpen(false)
-    resetNewAppointmentForm()
   }
 
-  const handleDeleteAppointment = (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta consulta?')) {
-      setAppointments(appointments.filter((apt) => apt.id !== id))
+  const handleDeleteAppointment = async (id: string) => {
+    if (!psychologistId) return
+    if (!confirm('Tem certeza que deseja excluir esta consulta?')) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/appointments/${id}`,
+        { method: 'DELETE' },
+      )
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao excluir consulta.')
+      }
+      await loadDashboard()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao excluir consulta.')
     }
   }
 
   const handleStartCall = (appointment: Appointment) => {
     const preference = appointment.notificationPreference
     const contact = appointment.patientContact
-    const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: https://meet.mindcare.app/${appointment.id}`
+    const baseUrl = appConfig.videoBaseUrl.replace(/\/$/, '')
+    const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${baseUrl}/${appointment.id}`
     
     if (preference === 'whatsapp') {
       alert(`✓ Notificação enviada via WhatsApp para ${contact}\n\nMensagem: ${message}`)
@@ -419,65 +377,66 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
     setAdditionalSlots((slots) => slots.filter((slot) => slot.id !== slotId))
   }
 
-  const updateCurrentPatient = (updater: (patient: PatientProfile) => PatientProfile) => {
-    if (!viewingPatient) return
-    setPatientProfiles((profiles) =>
-      profiles.map((profile) =>
-        profile.id === viewingPatient.id ? updater(profile) : profile
-      )
-    )
-    setViewingPatient((prev) => (prev ? updater(prev) : prev))
-  }
-
   const handleStartEditingField = (fieldId: string, currentValue?: string) => {
     setEditingField(fieldId)
     setEditingValue(currentValue ?? '')
   }
 
-  const handleSaveEditingField = () => {
-    if (!viewingPatient || !editingField) return
+  const handleSaveEditingField = async () => {
+    if (!viewingPatient || !editingField || !psychologistId) return
     const trimmedValue = editingValue.trim()
 
-    const updatedPatient = (patient: PatientProfile): PatientProfile => {
-      switch (editingField) {
-        case 'name':
-          return trimmedValue ? { ...patient, name: trimmedValue } : patient
-        case 'email':
-          return trimmedValue ? { ...patient, email: trimmedValue } : patient
-        case 'phone':
-          return trimmedValue ? { ...patient, phone: trimmedValue } : patient
-        case 'basicInfo.age':
-          return {
-            ...patient,
-            basicInfo: {
-              ...patient.basicInfo,
-              age: trimmedValue || undefined,
-            },
-          }
-        case 'basicInfo.occupation':
-          return {
-            ...patient,
-            basicInfo: {
-              ...patient.basicInfo,
-              occupation: trimmedValue || undefined,
-            },
-          }
-        case 'basicInfo.emergencyContact':
-          return {
-            ...patient,
-            basicInfo: {
-              ...patient.basicInfo,
-              emergencyContact: trimmedValue || undefined,
-            },
-          }
-        default:
-          return patient
-      }
+    let payload: Record<string, string> | null = null
+
+    switch (editingField) {
+      case 'name':
+        if (!trimmedValue) return
+        payload = { name: trimmedValue }
+        break
+      case 'email':
+        payload = { email: trimmedValue }
+        break
+      case 'phone':
+        payload = { phone: trimmedValue }
+        break
+      case 'basicInfo.age':
+        payload = { age: trimmedValue }
+        break
+      case 'basicInfo.occupation':
+        payload = { occupation: trimmedValue }
+        break
+      case 'basicInfo.emergencyContact':
+        payload = { emergencyContact: trimmedValue }
+        break
+      default:
+        break
     }
 
-    updateCurrentPatient(updatedPatient)
-    setEditingField(null)
-    setEditingValue('')
+    if (!payload) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao atualizar paciente.')
+      }
+
+      await loadDashboard()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao atualizar paciente.')
+    } finally {
+      setEditingField(null)
+      setEditingValue('')
+    }
   }
 
   const handleFieldInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -491,30 +450,34 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
     }
   }
 
-  const handleAddMedicalRecord = () => {
-    if (viewingPatient && newRecordTitle && newRecordContent) {
-      const newRecord: MedicalRecord = {
-        id: Date.now().toString(),
-        date: new Date(),
-        title: newRecordTitle,
-        content: newRecordContent,
-      }
-      
-      setPatientProfiles(
-        patientProfiles.map((p) =>
-          p.id === viewingPatient.id
-            ? { ...p, medicalRecords: [...p.medicalRecords, newRecord] }
-            : p
-        )
+  const handleAddMedicalRecord = async () => {
+    if (!viewingPatient || !psychologistId) return
+    if (!newRecordTitle || !newRecordContent) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}/records`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newRecordTitle,
+            content: newRecordContent,
+          }),
+        },
       )
-      
-      setViewingPatient({
-        ...viewingPatient,
-        medicalRecords: [...viewingPatient.medicalRecords, newRecord],
-      })
-      
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao salvar prontuário.')
+      }
+
+      await loadDashboard()
       setNewRecordTitle('')
       setNewRecordContent('')
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao salvar prontuário.')
     }
   }
 
@@ -523,82 +486,140 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
     setIsEditRecordDialogOpen(true)
   }
 
-  const handleSaveEditedMedicalRecord = () => {
-    if (!viewingPatient || !editingRecord) return
+  const handleSaveEditedMedicalRecord = async () => {
+    if (!viewingPatient || !editingRecord || !psychologistId) return
 
-    setPatientProfiles((profiles) =>
-      profiles.map((profile) =>
-        profile.id === viewingPatient.id
-          ? {
-              ...profile,
-              medicalRecords: profile.medicalRecords.map((record) =>
-                record.id === editingRecord.id ? editingRecord : record
-              ),
-            }
-          : profile
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}/records/${editingRecord.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: editingRecord.title,
+            content: editingRecord.content,
+            date: editingRecord.date.toISOString(),
+          }),
+        },
       )
-    )
 
-    setViewingPatient({
-      ...viewingPatient,
-      medicalRecords: viewingPatient.medicalRecords.map((record) =>
-        record.id === editingRecord.id ? editingRecord : record
-      ),
-    })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao atualizar prontuário.')
+      }
 
-    setIsEditRecordDialogOpen(false)
-    setEditingRecord(null)
-  }
-
-  const handleDeleteMedicalRecord = (recordId: string) => {
-    if (!viewingPatient) return
-    if (!confirm('Deseja excluir este prontuário?')) return
-
-    setPatientProfiles((profiles) =>
-      profiles.map((profile) =>
-        profile.id === viewingPatient.id
-          ? {
-              ...profile,
-              medicalRecords: profile.medicalRecords.filter((record) => record.id !== recordId),
-            }
-          : profile
-      )
-    )
-
-    setViewingPatient({
-      ...viewingPatient,
-      medicalRecords: viewingPatient.medicalRecords.filter((record) => record.id !== recordId),
-    })
-  }
-
-  const handleSaveReminder = () => {
-    if (editingReminder) {
-      setReminders(
-        reminders.map((rem) =>
-          rem.id === editingReminder.id ? editingReminder : rem
-        )
-      )
-      setIsReminderDialogOpen(false)
-      setEditingReminder(null)
+      await loadDashboard()
+      setIsEditRecordDialogOpen(false)
+      setEditingRecord(null)
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao atualizar prontuário.')
     }
   }
 
-  const handleAddReminder = () => {
-    if (newReminderText.trim()) {
-      const newReminder: Reminder = {
-        id: Date.now().toString(),
-        text: newReminderText,
-        color: newReminderColor,
+  const handleDeleteMedicalRecord = async (recordId: string) => {
+    if (!viewingPatient || !psychologistId) return
+    if (!confirm('Deseja excluir este prontuário?')) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}/records/${recordId}`,
+        { method: 'DELETE' },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao excluir prontuário.')
       }
-      setReminders([...reminders, newReminder])
+
+      await loadDashboard()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao excluir prontuário.')
+    }
+  }
+
+  const handleSaveReminder = async () => {
+    if (!editingReminder || !psychologistId) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/reminders/${editingReminder.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: editingReminder.text,
+            color: editingReminder.color,
+          }),
+        },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao atualizar lembrete.')
+      }
+
+      await loadDashboard()
+      setIsReminderDialogOpen(false)
+      setEditingReminder(null)
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao atualizar lembrete.')
+    }
+  }
+
+  const handleAddReminder = async () => {
+    if (!psychologistId) return
+    if (!newReminderText.trim()) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/reminders`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: newReminderText,
+            color: newReminderColor,
+          }),
+        },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao criar lembrete.')
+      }
+
+      await loadDashboard()
       setNewReminderText('')
       setNewReminderColor('blue')
       setIsAddReminderOpen(false)
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao criar lembrete.')
     }
   }
 
-  const handleDeleteReminder = (id: string) => {
-    setReminders(reminders.filter((rem) => rem.id !== id))
+  const handleDeleteReminder = async (id: string) => {
+    if (!psychologistId) return
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/reminders/${id}`,
+        { method: 'DELETE' },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao excluir lembrete.')
+      }
+
+      await loadDashboard()
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao excluir lembrete.')
+    }
   }
 
   const getStatusColor = (status: AppointmentStatus) => {
@@ -700,6 +721,19 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {!psychologistId && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Não foi possível carregar o perfil do profissional. Faça login novamente.
+          </div>
+        )}
+        {loadError && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {loadError}
+          </div>
+        )}
+        {isLoading && (
+          <p className="mb-4 text-sm text-muted-foreground">Carregando dados...</p>
+        )}
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">
             {/* Stats Cards */}

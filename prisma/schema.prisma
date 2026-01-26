@@ -8,12 +8,109 @@ datasource db {
 }
 
 model Psychologist {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  status          String   @default("pending")
+  pin             String?
+  notes           String?
+  inviteToken     String?  @unique
+  inviteExpiresAt DateTime?
+  inviteAcceptedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patients     Patient[]
+  appointments Appointment[]
+  reminders    Reminder[]
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions AdminSession[]
+}
+
+model AdminSession {
   id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  status    String   @default("pending")
-  pin       String?
-  notes     String?
+  adminId   String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  psychologistId   String
+  name             String
+  email            String?
+  phone            String?
+  age              String?
+  occupation       String?
+  emergencyContact String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  psychologist  Psychologist  @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  medicalRecords MedicalRecord[]
+
+  @@index([psychologistId])
+}
+
+model MedicalRecord {
+  id        String   @id @default(cuid())
+  patientId String
+  date      DateTime
+  title     String
+  content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+}
+
+model Appointment {
+  id                     String   @id @default(cuid())
+  psychologistId         String
+  patientId              String
+  date                   DateTime
+  time                   String
+  duration               String
+  status                 String
+  notes                  String?
+  notificationPreference String
+  patientContact         String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  psychologist Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([psychologistId])
+  @@index([patientId])
+}
+
+model Reminder {
+  id             String   @id @default(cuid())
+  psychologistId String
+  text           String
+  color          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  psychologist Psychologist @relation(fields: [psychologistId], references: [id], onDelete: Cascade)
+
+  @@index([psychologistId])
 }

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Brain } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PsychologistProfile } from '@/lib/psychologists'
+import { appConfig } from '@/lib/app-config'
 
 interface AuthScreenProps {
   onLogin: (name: string) => void
@@ -98,8 +99,8 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
             <Brain className="h-8 w-8 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-3xl font-semibold text-foreground">MindCare</h1>
-            <p className="text-sm text-muted-foreground">Sua Jornada de Bem-Estar Mental</p>
+            <h1 className="text-3xl font-semibold text-foreground">{appConfig.name}</h1>
+            <p className="text-sm text-muted-foreground">{appConfig.tagline}</p>
           </div>
         </div>
 
@@ -225,12 +226,12 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
           <DialogHeader>
             <DialogTitle className="text-2xl">Área do Psicólogo</DialogTitle>
             <DialogDescription>
-              Somente profissionais aprovados pela equipe MindCare conseguem acessar esta área.
+              Somente profissionais aprovados pela equipe {appConfig.name} conseguem acessar esta área.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5 pt-2">
             <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-              Precisa de acesso? Solicite aprovação à equipe administrativa através do link privado fornecido pela MindCare.
+              Precisa de acesso? Solicite aprovação à equipe administrativa através do link privado fornecido pela {appConfig.name}.
             </div>
               <form onSubmit={handlePsychologistLogin} className="space-y-4">
               <div className="space-y-2">
@@ -238,7 +239,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                 <Input
                   id="psychologist-login-email"
                   type="email"
-                  placeholder="psicologo@mindcare.com"
+                  placeholder="psicologo@seudominio.com"
                   value={psychologistLoginEmail}
                   onChange={(e) => setPsychologistLoginEmail(e.target.value)}
                   required
@@ -262,7 +263,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                   className="bg-input tracking-[0.3em]"
                 />
                 <p className="text-xs text-muted-foreground">
-                  O PIN é enviado pela equipe MindCare após a aprovação do cadastro.
+                  O PIN é definido por você no link de cadastro enviado pela equipe {appConfig.name}.
                 </p>
               </div>
               {psychologistLoginError && (
@@ -277,7 +278,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
               </Button>
             </form>
             <p className="text-xs text-muted-foreground text-center">
-              Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da MindCare.
+              Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da {appConfig.name}.
             </p>
           </div>
         </DialogContent>

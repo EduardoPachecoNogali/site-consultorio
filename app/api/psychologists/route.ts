@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { serializePsychologist } from '@/lib/psychologists'
+import { appConfig } from '@/lib/app-config'
+import { getAdminFromRequest } from '@/lib/admin-auth'
 
 export async function GET() {
+  const admin = await getAdminFromRequest()
+  if (!admin) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
+  }
+
   const records = await prisma.psychologist.findMany({
     orderBy: { createdAt: 'desc' },
   })
@@ -12,6 +19,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const admin = await getAdminFromRequest()
+  if (!admin) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
+  }
+
   const { name, email, notes } = await request.json()
 
   if (!email || typeof email !== 'string') {
@@ -36,7 +48,7 @@ export async function POST(request: Request) {
 
   const record = await prisma.psychologist.create({
     data: {
-      name: (name || 'Profissional MindCare').trim(),
+      name: (name || `Profissional ${appConfig.name}`).trim(),
       email: normalizedEmail,
       notes: notes?.trim() || null,
       status: 'pending',

@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAdminFromRequest } from '@/lib/admin-auth'
 
 interface Params {
   params: { id: string }
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
+  const admin = await getAdminFromRequest()
+  if (!admin) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
+  }
+
   const { id } = params
 
   try {

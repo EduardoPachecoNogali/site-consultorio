@@ -6,12 +6,14 @@ import { PatientDashboard } from '@/components/patient-dashboard'
 import { VideoConsultation } from '@/components/video-consultation'
 import { PsychologistDashboard } from '@/components/psychologist-dashboard-complete'
 import { PsychologistProfile } from '@/lib/psychologists'
+import { appConfig } from '@/lib/app-config'
 
 type ViewType = 'auth' | 'dashboard' | 'video' | 'psychologist'
 
 export default function Page() {
   const [currentView, setCurrentView] = useState<ViewType>('auth')
   const [userName, setUserName] = useState('')
+  const [psychologistId, setPsychologistId] = useState<string | null>(null)
 
   const handleLogin = (name: string) => {
     setUserName(name)
@@ -19,7 +21,10 @@ export default function Page() {
   }
 
   const handlePsychologistLogin = (profile: PsychologistProfile) => {
-    setUserName(profile.name || profile.email.split('@')[0] || 'Profissional MindCare')
+    setUserName(
+      profile.name || profile.email.split('@')[0] || `Profissional ${appConfig.name}`,
+    )
+    setPsychologistId(profile.id)
     setCurrentView('psychologist')
   }
 
@@ -33,6 +38,7 @@ export default function Page() {
 
   const handleLogout = () => {
     setUserName('')
+    setPsychologistId(null)
     setCurrentView('auth')
   }
 
@@ -55,6 +61,7 @@ export default function Page() {
       {currentView === 'psychologist' && (
         <PsychologistDashboard
           psychologistName={userName}
+          psychologistId={psychologistId ?? ''}
           onLogout={handleLogout}
         />
       )}

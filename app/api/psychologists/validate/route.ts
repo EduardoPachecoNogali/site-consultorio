@@ -32,9 +32,16 @@ export async function POST(request: Request) {
     )
   }
 
+  if (!psychologist.pin) {
+    return NextResponse.json(
+      { error: 'Cadastro ainda não foi concluído. Verifique seu email.' },
+      { status: 403 },
+    )
+  }
+
   if (psychologist.pin !== pin) {
     return NextResponse.json(
-      { error: 'PIN inválido. Verifique o código enviado por email.' },
+      { error: 'PIN inválido. Verifique o PIN definido no seu cadastro.' },
       { status: 401 },
     )
   }

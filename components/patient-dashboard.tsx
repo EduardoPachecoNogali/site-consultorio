@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Brain, Calendar, Clock, Video, User, LogOut } from 'lucide-react'
+import { appConfig } from '@/lib/app-config'
 
 interface PatientDashboardProps {
   userName: string
@@ -12,6 +13,14 @@ interface PatientDashboardProps {
 }
 
 export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDashboardProps) {
+  const nextAppointment: null | {
+    doctor: string
+    specialty: string
+    date: string
+    time: string
+  } = null
+  const pastAppointments: { date: string; doctor: string; duration: string }[] = []
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -22,7 +31,7 @@ export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDash
               <Brain className="h-6 w-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">MindCare</h1>
+              <h1 className="text-xl font-semibold text-foreground">{appConfig.name}</h1>
               <p className="text-xs text-muted-foreground">Plataforma de Teleatendimento</p>
             </div>
           </div>
@@ -63,52 +72,58 @@ export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDash
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <p className="font-semibold text-foreground">Dra. Sarah Mitchell</p>
-                        <p className="text-sm text-muted-foreground">Psicóloga Clínica</p>
+                {nextAppointment ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-6 w-6 text-primary" />
                       </div>
-                      
-                      <Separator className="bg-border/50" />
-                      
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Data</p>
-                            <p className="text-sm font-medium text-foreground">Segunda, 27 Jan 2026</p>
-                          </div>
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <p className="font-semibold text-foreground">{nextAppointment.doctor}</p>
+                          <p className="text-sm text-muted-foreground">{nextAppointment.specialty}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Horário</p>
-                            <p className="text-sm font-medium text-foreground">14:00 - 15:00</p>
-                          </div>
-                        </div>
-                      </div>
 
-                      <Button 
-                        onClick={onJoinCall}
-                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
-                      >
-                        <Video className="mr-2 h-4 w-4" />
-                        Entrar na Chamada
-                      </Button>
+                        <Separator className="bg-border/50" />
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-primary" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Data</p>
+                              <p className="text-sm font-medium text-foreground">{nextAppointment.date}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-primary" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Horário</p>
+                              <p className="text-sm font-medium text-foreground">{nextAppointment.time}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={onJoinCall}
+                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+                        >
+                          <Video className="mr-2 h-4 w-4" />
+                          Entrar na Chamada
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-accent/20 p-3">
+                      <p className="text-sm text-accent-foreground">
+                        <strong>Nota:</strong> Entre 5 minutos antes do horário agendado. Certifique-se de estar em um local silencioso e privado.
+                      </p>
                     </div>
                   </div>
-                </div>
-
-                <div className="rounded-lg bg-accent/20 p-3">
-                  <p className="text-sm text-accent-foreground">
-                    <strong>Nota:</strong> Entre 5 minutos antes do horário agendado. Certifique-se de estar em um local silencioso e privado.
-                  </p>
-                </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground">
+                    Nenhuma consulta agendada. Assim que uma sessão for marcada, ela aparecerá aqui.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -123,25 +138,27 @@ export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDash
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {[
-                  { date: '20 Jan 2026', doctor: 'Dra. Sarah Mitchell', duration: '50 min' },
-                  { date: '13 Jan 2026', doctor: 'Dra. Sarah Mitchell', duration: '50 min' },
-                  { date: '6 Jan 2026', doctor: 'Dra. Sarah Mitchell', duration: '50 min' },
-                ].map((appointment, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:bg-muted/30"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                {pastAppointments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma consulta anterior registrada ainda.
+                  </p>
+                ) : (
+                  pastAppointments.map((appointment, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:bg-muted/30"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">{appointment.date}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.doctor}</p>
+                        <p className="text-xs text-muted-foreground">{appointment.duration}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{appointment.date}</p>
-                      <p className="text-xs text-muted-foreground">{appointment.doctor}</p>
-                      <p className="text-xs text-muted-foreground">{appointment.duration}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
