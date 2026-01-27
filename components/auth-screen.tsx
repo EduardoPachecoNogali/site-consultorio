@@ -23,15 +23,28 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [isPsychologistDialogOpen, setIsPsychologistDialogOpen] = useState(false)
+  const [psychologistDialogMode, setPsychologistDialogMode] = useState<'login' | 'request'>(
+    'login',
+  )
   const [psychologistLoginEmail, setPsychologistLoginEmail] = useState('')
   const [psychologistLoginPin, setPsychologistLoginPin] = useState('')
   const [psychologistLoginError, setPsychologistLoginError] = useState('')
   const [isPsychologistSubmitting, setIsPsychologistSubmitting] = useState(false)
+  const [psychologistRequestName, setPsychologistRequestName] = useState('')
+  const [psychologistRequestEmail, setPsychologistRequestEmail] = useState('')
+  const [psychologistRequestError, setPsychologistRequestError] = useState('')
+  const [psychologistRequestSuccess, setPsychologistRequestSuccess] = useState('')
+  const [isPsychologistRequesting, setIsPsychologistRequesting] = useState(false)
 
   const resetPsychologistForms = () => {
+    setPsychologistDialogMode('login')
     setPsychologistLoginEmail('')
     setPsychologistLoginPin('')
     setPsychologistLoginError('')
+    setPsychologistRequestName('')
+    setPsychologistRequestEmail('')
+    setPsychologistRequestError('')
+    setPsychologistRequestSuccess('')
   }
 
   const handlePsychologistDialogChange = (open: boolean) => {
@@ -39,6 +52,19 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
     if (!open) {
       resetPsychologistForms()
     }
+  }
+
+  const openPsychologistDialog = (mode: 'login' | 'request') => {
+    setPsychologistDialogMode(mode)
+    setIsPsychologistDialogOpen(true)
+  }
+
+  const handlePsychologistTabChange = (value: string) => {
+    const mode = value === 'request' ? 'request' : 'login'
+    setPsychologistDialogMode(mode)
+    setPsychologistLoginError('')
+    setPsychologistRequestError('')
+    setPsychologistRequestSuccess('')
   }
 
   const handleLogin = (e: React.FormEvent) => {
@@ -88,6 +114,44 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
       .finally(() => {
         setIsPsychologistSubmitting(false)
       })
+  }
+
+  const handlePsychologistRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPsychologistRequestError('')
+    setPsychologistRequestSuccess('')
+
+    if (!psychologistRequestName.trim() || !psychologistRequestEmail.trim()) {
+      setPsychologistRequestError('Informe nome e email profissional.')
+      return
+    }
+
+    try {
+      setIsPsychologistRequesting(true)
+      const response = await fetch('/api/psychologists/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: psychologistRequestName.trim(),
+          email: psychologistRequestEmail.trim().toLowerCase(),
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Não foi possível enviar a solicitação.')
+      }
+
+      setPsychologistRequestSuccess(
+        'Solicitação enviada com sucesso. Aguarde o contato da equipe administrativa.',
+      )
+      setPsychologistRequestName('')
+      setPsychologistRequestEmail('')
+    } catch (error: any) {
+      setPsychologistRequestError(error.message || 'Não foi possível enviar a solicitação.')
+    } finally {
+      setIsPsychologistRequesting(false)
+    }
   }
 
   return (
@@ -151,7 +215,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                   <div className="text-center">
                     <button
                       type="button"
-                      onClick={() => handlePsychologistDialogChange(true)}
+                      onClick={() => openPsychologistDialog('login')}
                       className="text-sm font-medium text-primary hover:underline"
                     >
                       Entrar como psicólogo
@@ -205,7 +269,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                     Psicólogo ou psicóloga?
                     <button
                       type="button"
-                      onClick={() => handlePsychologistDialogChange(true)}
+                      onClick={() => openPsychologistDialog('request')}
                       className="ml-1 font-medium text-primary hover:underline"
                     >
                       Cadastrar como psicólogo
@@ -226,61 +290,115 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
           <DialogHeader>
             <DialogTitle className="text-2xl">Área do Psicólogo</DialogTitle>
             <DialogDescription>
-              Somente profissionais aprovados pela equipe {appConfig.name} conseguem acessar esta área.
+              Solicite acesso ou entre com o PIN enviado pela equipe {appConfig.name}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 pt-2">
-            <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-              Precisa de acesso? Solicite aprovação à equipe administrativa através do link privado fornecido pela {appConfig.name}.
-            </div>
+          <Tabs
+            value={psychologistDialogMode}
+            onValueChange={handlePsychologistTabChange}
+            className="w-full pt-2"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Já tenho convite</TabsTrigger>
+              <TabsTrigger value="request">Solicitar acesso</TabsTrigger>
+            </TabsList>
+            <TabsContent value="login" className="space-y-5 pt-4">
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                Use o email profissional e o PIN recebido para entrar.
+              </div>
               <form onSubmit={handlePsychologistLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="psychologist-login-email">Email profissional</Label>
-                <Input
-                  id="psychologist-login-email"
-                  type="email"
-                  placeholder="psicologo@seudominio.com"
-                  value={psychologistLoginEmail}
-                  onChange={(e) => setPsychologistLoginEmail(e.target.value)}
-                  required
-                  className="bg-input"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="psychologist-login-email">Email profissional</Label>
+                  <Input
+                    id="psychologist-login-email"
+                    type="email"
+                    placeholder="psicologo@seudominio.com"
+                    value={psychologistLoginEmail}
+                    onChange={(e) => setPsychologistLoginEmail(e.target.value)}
+                    required
+                    className="bg-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="psychologist-login-pin">PIN de acesso (6 dígitos)</Label>
+                  <Input
+                    id="psychologist-login-pin"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    placeholder="Ex: 123456"
+                    value={psychologistLoginPin}
+                    onChange={(e) =>
+                      setPsychologistLoginPin(e.target.value.replace(/[^0-9]/g, ''))
+                    }
+                    required
+                    className="bg-input tracking-[0.3em]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    O PIN é definido por você no link de cadastro enviado pela equipe {appConfig.name}.
+                  </p>
+                </div>
+                {psychologistLoginError && (
+                  <p className="text-sm text-destructive">{psychologistLoginError}</p>
+                )}
+                <Button
+                  type="submit"
+                  disabled={isPsychologistSubmitting}
+                  className="w-full bg-[#c7a4ff] text-[#301144] hover:bg-[#b78bf7]"
+                >
+                  {isPsychologistSubmitting ? 'Validando...' : 'Entrar na área profissional'}
+                </Button>
+              </form>
+            </TabsContent>
+            <TabsContent value="request" className="space-y-5 pt-4">
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                Envie seus dados para aprovação da equipe administrativa.
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="psychologist-login-pin">PIN de acesso (6 dígitos)</Label>
-                <Input
-                  id="psychologist-login-pin"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  placeholder="Ex: 123456"
-                  value={psychologistLoginPin}
-                  onChange={(e) =>
-                    setPsychologistLoginPin(e.target.value.replace(/[^0-9]/g, ''))
-                  }
-                  required
-                  className="bg-input tracking-[0.3em]"
-                />
-                <p className="text-xs text-muted-foreground">
-                  O PIN é definido por você no link de cadastro enviado pela equipe {appConfig.name}.
-                </p>
-              </div>
-              {psychologistLoginError && (
-                <p className="text-sm text-destructive">{psychologistLoginError}</p>
-              )}
-              <Button
-                type="submit"
-                disabled={isPsychologistSubmitting}
-                className="w-full bg-[#c7a4ff] text-[#301144] hover:bg-[#b78bf7]"
-              >
-                {isPsychologistSubmitting ? 'Validando...' : 'Entrar na área profissional'}
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground text-center">
-              Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da {appConfig.name}.
-            </p>
-          </div>
+              <form onSubmit={handlePsychologistRequest} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="psychologist-request-name">Nome completo</Label>
+                  <Input
+                    id="psychologist-request-name"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={psychologistRequestName}
+                    onChange={(e) => setPsychologistRequestName(e.target.value)}
+                    required
+                    className="bg-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="psychologist-request-email">Email profissional</Label>
+                  <Input
+                    id="psychologist-request-email"
+                    type="email"
+                    placeholder="psicologo@seudominio.com"
+                    value={psychologistRequestEmail}
+                    onChange={(e) => setPsychologistRequestEmail(e.target.value)}
+                    required
+                    className="bg-input"
+                  />
+                </div>
+                {psychologistRequestError && (
+                  <p className="text-sm text-destructive">{psychologistRequestError}</p>
+                )}
+                {psychologistRequestSuccess && (
+                  <p className="text-sm text-emerald-600">{psychologistRequestSuccess}</p>
+                )}
+                <Button
+                  type="submit"
+                  disabled={isPsychologistRequesting}
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isPsychologistRequesting ? 'Enviando...' : 'Enviar solicitação'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+          <p className="text-xs text-muted-foreground text-center">
+            Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da {appConfig.name}.
+          </p>
         </DialogContent>
       </Dialog>
     </div>

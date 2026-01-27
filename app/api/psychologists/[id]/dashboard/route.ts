@@ -2,7 +2,24 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
+}
+
+const resolveParams = async (params?: Params['params']) => {
+  if (!params) return undefined
+  return typeof (params as Promise<{ id?: string }>)?.then === 'function'
+    ? await (params as Promise<{ id?: string }>)
+    : (params as { id?: string })
+}
+
+const getIdFromRequest = (request: Request, params?: { id?: string }) => {
+  if (params?.id) return params.id
+  const pathname = new URL(request.url).pathname
+  const segments = pathname.split('/').filter(Boolean)
+  if (segments.length >= 4 && segments[0] === 'api' && segments[1] === 'psychologists') {
+    return segments[2]
+  }
+  return undefined
 }
 
 type AppointmentCounts = {
@@ -34,8 +51,12 @@ const buildCounts = (appointments: { patientId: string; status: string }[]) => {
   return counts
 }
 
-export async function GET(_request: Request, { params }: Params) {
-  const { id } = params
+export async function GET(request: Request, { params }: Params) {
+  const resolvedParams = await resolveParams(params)
+  const id = getIdFromRequest(request, resolvedParams)
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
 
   const psychologist = await prisma.psychologist.findUnique({ where: { id } })
   if (!psychologist) {

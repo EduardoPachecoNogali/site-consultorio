@@ -7,16 +7,37 @@ import { getAdminFromRequest } from '@/lib/admin-auth'
 import crypto from 'crypto'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
 }
 
-export async function POST(_request: Request, { params }: Params) {
+const resolveParams = async (params?: Params['params']) => {
+  if (!params) return undefined
+  return typeof (params as Promise<{ id?: string }>)?.then === 'function'
+    ? await (params as Promise<{ id?: string }>)
+    : (params as { id?: string })
+}
+
+const getIdFromRequest = (request: Request, params?: { id?: string }) => {
+  if (params?.id) return params.id
+  const pathname = new URL(request.url).pathname
+  const segments = pathname.split('/').filter(Boolean)
+  if (segments.length >= 4 && segments[0] === 'api' && segments[1] === 'psychologists') {
+    return segments[2]
+  }
+  return undefined
+}
+
+export async function POST(request: Request, { params }: Params) {
   const admin = await getAdminFromRequest()
   if (!admin) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
-  const { id } = params
+  const resolvedParams = await resolveParams(params)
+  const id = getIdFromRequest(request, resolvedParams)
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
 
   const psychologist = await prisma.psychologist.findUnique({ where: { id } })
   if (!psychologist) {

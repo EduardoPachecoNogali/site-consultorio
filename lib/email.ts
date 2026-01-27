@@ -40,10 +40,14 @@ export async function sendMail({ to, subject, html }: SendMailParams) {
     return
   }
 
-  await transporter.sendMail({
-    from,
-    to,
-    subject,
-    html,
-  })
+  try {
+    await transporter.sendMail({
+      from,
+      to,
+      subject,
+      html,
+    })
+  } catch (error) {
+    console.error('[email:error]', { to, subject, error })
+  }
 }

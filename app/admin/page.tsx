@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
+import { PsychologistProfile } from '@/lib/psychologists'
 
 interface NewPsychologistForm {
   name: string
@@ -22,6 +23,10 @@ export default function AdminPsychologistsPage() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [psychologistRequests, setPsychologistRequests] = useState<PsychologistProfile[]>([])
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false)
+  const [requestsError, setRequestsError] = useState('')
+  const [approvingId, setApprovingId] = useState<string | null>(null)
 
   const [newPsychologist, setNewPsychologist] = useState<NewPsychologistForm>({
     name: '',
@@ -42,9 +47,36 @@ export default function AdminPsychologistsPage() {
     }
   }
 
+  const loadPsychologistRequests = async () => {
+    setRequestsError('')
+    setIsLoadingRequests(true)
+    try {
+      const response = await fetch('/api/psychologists')
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Não foi possível carregar as solicitações.')
+      }
+      const data = await response.json()
+      const pending = (data.psychologists || []).filter(
+        (psychologist: PsychologistProfile) => psychologist.status === 'pending',
+      )
+      setPsychologistRequests(pending)
+    } catch (error: any) {
+      setRequestsError(error.message || 'Não foi possível carregar as solicitações.')
+    } finally {
+      setIsLoadingRequests(false)
+    }
+  }
+
   useEffect(() => {
     checkAuth()
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadPsychologistRequests()
+    }
+  }, [isAuthenticated])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -126,10 +158,29 @@ export default function AdminPsychologistsPage() {
 
       setNewPsychologist({ name: '', email: '', notes: '' })
       setFeedbackMessage('Cadastro criado e convite enviado com sucesso.')
+      loadPsychologistRequests()
     } catch (error: any) {
       setFeedbackMessage(error.message || 'Erro ao criar cadastro.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleApproveRequest = async (psychologistId: string) => {
+    try {
+      setApprovingId(psychologistId)
+      const response = await fetch(`/api/psychologists/${psychologistId}/approve`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Não foi possível aprovar o cadastro.')
+      }
+      await loadPsychologistRequests()
+    } catch (error: any) {
+      setRequestsError(error.message || 'Não foi possível aprovar o cadastro.')
+    } finally {
+      setApprovingId(null)
     }
   }
 
@@ -199,6 +250,51 @@ export default function AdminPsychologistsPage() {
   return (
     <main className="min-h-screen bg-background p-6">
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Solicitações pendentes</CardTitle>
+            <CardDescription>
+              Psicólogos aguardando aprovação para receber o convite de cadastro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingRequests && (
+              <p className="text-sm text-muted-foreground">Carregando solicitações...</p>
+            )}
+            {requestsError && (
+              <p className="text-sm text-destructive">{requestsError}</p>
+            )}
+            {!isLoadingRequests && psychologistRequests.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma solicitação pendente no momento.
+              </p>
+            )}
+            {psychologistRequests.length > 0 && (
+              <div className="space-y-3">
+                {psychologistRequests.map((psychologist) => (
+                  <div
+                    key={psychologist.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {psychologist.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{psychologist.email}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveRequest(psychologist.id)}
+                      disabled={approvingId === psychologist.id}
+                    >
+                      {approvingId === psychologist.id ? 'Aprovando...' : 'Aprovar e enviar convite'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
