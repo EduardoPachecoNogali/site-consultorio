@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -8,17 +9,65 @@ import { appConfig } from '@/lib/app-config'
 
 interface PatientDashboardProps {
   userName: string
-  onJoinCall: () => void
+  userEmail: string
+  onJoinCall: (meetingUrl: string) => void
   onLogout: () => void
 }
 
-export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDashboardProps) {
-  const nextAppointment: null | {
-    doctor: string
-    specialty: string
-    date: string
-    time: string
-  } = null
+type NextAppointment = null | {
+  id: string
+  doctor: string
+  specialty: string
+  date: string
+  time: string
+  meetingUrl: string
+}
+
+export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: PatientDashboardProps) {
+  const [nextAppointment, setNextAppointment] = useState<NextAppointment>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    if (!userEmail) return
+    setIsLoading(true)
+    setLoadError('')
+    fetch(`/api/patients/next?email=${encodeURIComponent(userEmail)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setNextAppointment(null)
+            return null
+          }
+          const data = await response.json()
+          throw new Error(data.error || 'Não foi possível carregar a próxima consulta.')
+        }
+        return response.json()
+      })
+      .then((data) => {
+        if (!data) return
+        setNextAppointment({
+          id: data.appointment.id,
+          doctor: data.appointment.psychologistName || 'Psicólogo(a)',
+          specialty: data.appointment.specialty || 'Psicologia',
+          date: new Date(data.appointment.date).toLocaleDateString('pt-BR'),
+          time: data.appointment.time,
+          meetingUrl: data.appointment.meetingUrl,
+        })
+      })
+      .catch((error: Error) => {
+        setLoadError(error.message)
+      })
+      .finally(() => setIsLoading(false))
+  }, [userEmail])
+
+  const handleJoinCall = () => {
+    if (!nextAppointment?.meetingUrl) {
+      setLoadError('Link da consulta indisponível no momento.')
+      return
+    }
+    onJoinCall(nextAppointment.meetingUrl)
+  }
   const pastAppointments: { date: string; doctor: string; duration: string }[] = []
 
   return (
@@ -72,7 +121,15 @@ export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDash
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {nextAppointment ? (
+                {isLoading ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground">
+                    Carregando próxima consulta...
+                  </div>
+                ) : loadError ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-destructive">
+                    {loadError}
+                  </div>
+                ) : nextAppointment ? (
                   <div className="space-y-3">
                     <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -104,7 +161,7 @@ export function PatientDashboard({ userName, onJoinCall, onLogout }: PatientDash
                         </div>
 
                         <Button
-                          onClick={onJoinCall}
+                          onClick={handleJoinCall}
                           className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
                         >
                           <Video className="mr-2 h-4 w-4" />

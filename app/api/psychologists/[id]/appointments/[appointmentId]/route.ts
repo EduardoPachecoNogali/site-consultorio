@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveRouteParams } from '@/lib/route-params'
 
 interface Params {
-  params: { id: string; appointmentId: string }
+  params?: { id?: string; appointmentId?: string } | Promise<{ id?: string; appointmentId?: string }>
 }
 
 const normalizeString = (value: unknown) =>
@@ -19,11 +20,20 @@ const normalizeDate = (value: string) => {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  const { id, appointmentId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const appointmentId = resolvedParams?.appointmentId
+  if (!id || !appointmentId) {
+    return NextResponse.json(
+      { error: 'Consulta inválida.' },
+      { status: 400 },
+    )
+  }
   const payload = await request.json()
 
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, psychologistId: id },
+    include: { patient: true },
   })
 
   if (!appointment) {
@@ -58,11 +68,24 @@ export async function PATCH(request: Request, { params }: Params) {
   if (payload.notes !== undefined) {
     updateData.notes = normalizeString(payload.notes) || null
   }
-  if (payload.notificationPreference) {
-    updateData.notificationPreference = normalizeString(payload.notificationPreference)
+  if (payload.notificationPreference !== undefined) {
+    updateData.notificationPreference = 'email'
   }
   if (payload.patientContact !== undefined) {
     updateData.patientContact = normalizeString(payload.patientContact)
+  }
+
+  const nextContact =
+    updateData.patientContact ??
+    appointment.patient.email ??
+    appointment.patientContact
+  if (!nextContact) {
+    return NextResponse.json(
+      {
+        error: 'Informe o email do paciente.',
+      },
+      { status: 400 },
+    )
   }
 
   const updated = await prisma.appointment.update({
@@ -81,12 +104,21 @@ export async function PATCH(request: Request, { params }: Params) {
       date: updated.date.toISOString(),
       notificationPreference: updated.notificationPreference,
       patientContact: updated.patientContact,
+      meetingUrl: updated.meetingUrl ?? '',
     },
   })
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const { id, appointmentId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const appointmentId = resolvedParams?.appointmentId
+  if (!id || !appointmentId) {
+    return NextResponse.json(
+      { error: 'Consulta inválida.' },
+      { status: 400 },
+    )
+  }
 
   const appointment = await prisma.appointment.findFirst({
     where: { id: appointmentId, psychologistId: id },

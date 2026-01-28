@@ -129,6 +129,7 @@ export async function GET(request: Request, { params }: Params) {
     date: appointment.date.toISOString(),
     notificationPreference: appointment.notificationPreference,
     patientContact: appointment.patientContact,
+    meetingUrl: appointment.meetingUrl ?? '',
   }))
 
   const serializedReminders = reminders.map((reminder) => ({
@@ -138,6 +139,13 @@ export async function GET(request: Request, { params }: Params) {
   }))
 
   return NextResponse.json({
+    google: {
+      connected: Boolean(psychologist.googleRefreshToken),
+      email: psychologist.googleEmail ?? psychologist.email,
+      connectedAt: psychologist.googleConnectedAt
+        ? psychologist.googleConnectedAt.toISOString()
+        : null,
+    },
     patients: serializedPatients,
     appointments: serializedAppointments,
     reminders: serializedReminders,

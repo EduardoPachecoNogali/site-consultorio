@@ -7,6 +7,9 @@ export interface PsychologistProfile {
   status: PsychologistStatus
   pin?: string | null
   notes?: string | null
+  googleEmail?: string | null
+  googleCalendarId?: string | null
+  googleConnectedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -18,6 +21,9 @@ type PsychologistRecord = {
   status: string
   pin: string | null
   notes: string | null
+  googleEmail: string | null
+  googleCalendarId: string | null
+  googleConnectedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -31,6 +37,9 @@ export const serializePsychologist = (
   status: (record.status as PsychologistStatus) ?? 'pending',
   pin: record.pin,
   notes: record.notes,
+  googleEmail: record.googleEmail,
+  googleCalendarId: record.googleCalendarId,
+  googleConnectedAt: record.googleConnectedAt?.toISOString() ?? null,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 })

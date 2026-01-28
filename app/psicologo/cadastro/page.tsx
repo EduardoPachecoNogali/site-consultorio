@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +11,7 @@ import { appConfig } from '@/lib/app-config'
 
 export default function PsychologistRegistrationPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const token = searchParams.get('token')
 
   const [name, setName] = useState('')
@@ -77,7 +78,10 @@ export default function PsychologistRegistrationPage() {
         throw new Error(data.error || 'Erro ao concluir cadastro.')
       }
 
-      setSuccessMessage('Cadastro concluído! Você já pode acessar a área profissional.')
+      setSuccessMessage('Cadastro concluído! Redirecionando para o login...')
+      setTimeout(() => {
+        router.push('/?psychologist=login')
+      }, 1200)
     } catch (error: any) {
       setErrorMessage(error.message || 'Erro ao concluir cadastro.')
     } finally {

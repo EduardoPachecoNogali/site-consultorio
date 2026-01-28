@@ -7,7 +7,7 @@ import './globals.css'
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || 'MindCare'
+const appName = process.env.NEXT_PUBLIC_APP_NAME || 'PsicoLink'
 const appDescription =
   process.env.NEXT_PUBLIC_APP_DESCRIPTION ||
   'Conecte-se com psicólogos licenciados através de consultas por vídeo seguras'

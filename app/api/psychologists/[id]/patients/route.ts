@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveRouteParams } from '@/lib/route-params'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
 }
 
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
 export async function POST(request: Request, { params }: Params) {
-  const { id } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
   const payload = await request.json()
 
   const name = normalizeString(payload.name)

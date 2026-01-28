@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/email'
 import { appConfig } from '@/lib/app-config'
 import { getAdminFromRequest } from '@/lib/admin-auth'
+import { resolveRouteParams } from '@/lib/route-params'
 import crypto from 'crypto'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
 }
 
 export async function POST(_request: Request, { params }: Params) {
@@ -15,7 +16,11 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
-  const { id } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
 
   const psychologist = await prisma.psychologist.findUnique({ where: { id } })
   if (!psychologist) {

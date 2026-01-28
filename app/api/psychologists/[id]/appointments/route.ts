@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveRouteParams } from '@/lib/route-params'
+import { createMeetLink } from '@/lib/google-meet'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
 }
 
 const normalizeString = (value: unknown) =>
@@ -31,7 +33,11 @@ const resolveSlots = (payload: any) => {
 }
 
 export async function POST(request: Request, { params }: Params) {
-  const { id } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
   const payload = await request.json()
 
   const patientName = normalizeString(payload.patientName)
@@ -39,8 +45,8 @@ export async function POST(request: Request, { params }: Params) {
   const patientPhone = normalizeString(payload.patientPhone)
   const duration = normalizeString(payload.duration) || '50 min'
   const notes = normalizeString(payload.notes)
-  const notificationPreference = normalizeString(payload.notificationPreference)
-  const patientContact = normalizeString(payload.patientContact)
+  const notificationPreference = 'email'
+  const resolvedContact = patientEmail
 
   const slots = resolveSlots(payload)
     .map((slot: any) => ({
@@ -52,6 +58,22 @@ export async function POST(request: Request, { params }: Params) {
   if (!patientName || slots.length === 0) {
     return NextResponse.json(
       { error: 'Informe o paciente e ao menos um horário.' },
+      { status: 400 },
+    )
+  }
+
+  if (!patientEmail) {
+    return NextResponse.json(
+      { error: 'Informe o email do paciente.' },
+      { status: 400 },
+    )
+  }
+
+  if (!resolvedContact) {
+    return NextResponse.json(
+      {
+        error: 'Informe o email do paciente.',
+      },
       { status: 400 },
     )
   }
@@ -120,16 +142,55 @@ export async function POST(request: Request, { params }: Params) {
           duration,
           status: 'upcoming',
           notes: notes || null,
-          notificationPreference: notificationPreference || 'whatsapp',
-          patientContact: patientContact || patientPhone || patientEmail || '',
+          notificationPreference,
+          patientContact: resolvedContact,
         },
       }),
     ),
   )
 
+  let finalizedAppointments = createdAppointments
+
+  if (psychologist.googleRefreshToken) {
+    try {
+      finalizedAppointments = await Promise.all(
+        createdAppointments.map(async (appointment) => {
+          const meetResult = await createMeetLink({
+            appointmentId: appointment.id,
+            patientEmail,
+            date: appointment.date,
+            time: appointment.time,
+            duration: appointment.duration,
+            psychologistName: psychologist.name,
+            patientName: patient!.name,
+            google: {
+              refreshToken: psychologist.googleRefreshToken,
+              calendarId: psychologist.googleCalendarId,
+              psychologistEmail: psychologist.googleEmail || psychologist.email,
+            },
+          })
+
+          if (!meetResult.ok) {
+            throw new Error(meetResult.error || 'Erro ao criar reunião no Google Meet.')
+          }
+
+          return prisma.appointment.update({
+            where: { id: appointment.id },
+            data: { meetingUrl: meetResult.meetingUrl },
+          })
+        }),
+      )
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: error.message || 'Erro ao criar reunião no Google Meet.' },
+        { status: 502 },
+      )
+    }
+  }
+
   return NextResponse.json(
     {
-      appointments: createdAppointments.map((appointment) => ({
+      appointments: finalizedAppointments.map((appointment) => ({
         id: appointment.id,
         patientId: appointment.patientId,
         patientName: patientName,
@@ -140,6 +201,7 @@ export async function POST(request: Request, { params }: Params) {
         date: appointment.date.toISOString(),
         notificationPreference: appointment.notificationPreference,
         patientContact: appointment.patientContact,
+        meetingUrl: appointment.meetingUrl ?? '',
       })),
     },
     { status: 201 },

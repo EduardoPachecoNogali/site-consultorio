@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
@@ -12,11 +13,12 @@ import { PsychologistProfile } from '@/lib/psychologists'
 import { appConfig } from '@/lib/app-config'
 
 interface AuthScreenProps {
-  onLogin: (name: string) => void
+  onLogin: (name: string, email: string) => void
   onPsychologistLogin: (psychologist: PsychologistProfile) => void
 }
 
 export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
+  const searchParams = useSearchParams()
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [signupName, setSignupName] = useState('')
@@ -35,6 +37,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
   const [psychologistRequestError, setPsychologistRequestError] = useState('')
   const [psychologistRequestSuccess, setPsychologistRequestSuccess] = useState('')
   const [isPsychologistRequesting, setIsPsychologistRequesting] = useState(false)
+  const [hasAutoOpenedDialog, setHasAutoOpenedDialog] = useState(false)
 
   const resetPsychologistForms = () => {
     setPsychologistDialogMode('login')
@@ -59,6 +62,15 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
     setIsPsychologistDialogOpen(true)
   }
 
+  useEffect(() => {
+    if (hasAutoOpenedDialog) return
+    const mode = searchParams.get('psychologist')
+    if (mode === 'login' || mode === 'request') {
+      openPsychologistDialog(mode)
+      setHasAutoOpenedDialog(true)
+    }
+  }, [hasAutoOpenedDialog, searchParams])
+
   const handlePsychologistTabChange = (value: string) => {
     const mode = value === 'request' ? 'request' : 'login'
     setPsychologistDialogMode(mode)
@@ -69,12 +81,13 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin(loginEmail.split('@')[0] || 'Usuário')
+    onLogin(loginEmail.split('@')[0] || 'Usuário', loginEmail.trim().toLowerCase())
   }
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault()
-    onLogin(signupName || signupEmail.split('@')[0] || 'Usuário')
+    const email = signupEmail.trim().toLowerCase()
+    onLogin(signupName || email.split('@')[0] || 'Usuário', email)
   }
 
   const handlePsychologistLogin = (e: React.FormEvent) => {

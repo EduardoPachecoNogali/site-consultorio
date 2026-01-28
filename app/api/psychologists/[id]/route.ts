@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminFromRequest } from '@/lib/admin-auth'
+import { resolveRouteParams } from '@/lib/route-params'
 
 interface Params {
-  params: { id: string }
+  params?: { id?: string } | Promise<{ id?: string }>
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
@@ -12,7 +13,11 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
-  const { id } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  if (!id) {
+    return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
 
   try {
     await prisma.psychologist.delete({

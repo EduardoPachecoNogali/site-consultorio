@@ -1,15 +1,24 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveRouteParams } from '@/lib/route-params'
 
 interface Params {
-  params: { id: string; reminderId: string }
+  params?: { id?: string; reminderId?: string } | Promise<{ id?: string; reminderId?: string }>
 }
 
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
 export async function PATCH(request: Request, { params }: Params) {
-  const { id, reminderId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const reminderId = resolvedParams?.reminderId
+  if (!id || !reminderId) {
+    return NextResponse.json(
+      { error: 'Lembrete inválido.' },
+      { status: 400 },
+    )
+  }
   const payload = await request.json()
 
   const reminder = await prisma.reminder.findFirst({
@@ -49,7 +58,15 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const { id, reminderId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const reminderId = resolvedParams?.reminderId
+  if (!id || !reminderId) {
+    return NextResponse.json(
+      { error: 'Lembrete inválido.' },
+      { status: 400 },
+    )
+  }
 
   const reminder = await prisma.reminder.findFirst({
     where: { id: reminderId, psychologistId: id },

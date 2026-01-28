@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, MessageCircle, Check, X, Calendar as CalendarDays } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Calendar as CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -25,8 +25,9 @@ interface Appointment {
   status: AppointmentStatus
   notes: string
   date: Date
-  notificationPreference: 'whatsapp' | 'email'
+  notificationPreference: 'email'
   patientContact: string
+  meetingUrl?: string
 }
 
 interface Reminder {
@@ -45,7 +46,6 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const [searchQuery, setSearchQuery] = useState('')
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [notificationPreference, setNotificationPreference] = useState<'whatsapp' | 'email'>('whatsapp')
   const [showWeekView, setShowWeekView] = useState(false)
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false)
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
@@ -84,18 +84,12 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   }
 
   const handleStartCall = (appointment: Appointment) => {
-    const preference = appointment.notificationPreference
     const contact = appointment.patientContact
     const baseUrl = appConfig.videoBaseUrl.replace(/\/$/, '')
     const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${baseUrl}/${appointment.id}`
-    
-    if (preference === 'whatsapp') {
-      alert(`Notificação enviada via WhatsApp para ${contact}\n\nMensagem: ${message}`)
-      // Em produção: integrar com API do WhatsApp Business
-    } else {
-      alert(`Email enviado para ${contact}\n\nAssunto: Sua consulta está iniciando\n\n${message}`)
-      // Em produção: integrar com serviço de email
-    }
+
+    alert(`Email enviado para ${contact}\n\nAssunto: Sua consulta está iniciando\n\n${message}`)
+    // Em produção: integrar com serviço de email
   }
 
   const handleSaveReminder = () => {
@@ -205,37 +199,10 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                    <MessageCircle className="h-4 w-4" />
-                    Preferência: {notificationPreference === 'whatsapp' ? 'WhatsApp' : 'Email'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60">
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Notificações</h4>
-                    <div className="space-y-2">
-                      <Button
-                        variant={notificationPreference === 'whatsapp' ? 'default' : 'outline'}
-                        className="w-full justify-start gap-2"
-                        onClick={() => setNotificationPreference('whatsapp')}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        WhatsApp
-                      </Button>
-                      <Button
-                        variant={notificationPreference === 'email' ? 'default' : 'outline'}
-                        className="w-full justify-start gap-2"
-                        onClick={() => setNotificationPreference('email')}
-                      >
-                        <Mail className="h-4 w-4" />
-                        Email
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <Button variant="outline" size="sm" className="gap-2 bg-transparent" disabled>
+                <Mail className="h-4 w-4" />
+                Preferência: Email
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

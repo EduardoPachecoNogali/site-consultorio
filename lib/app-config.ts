@@ -1,5 +1,5 @@
 export const appConfig = {
-  name: process.env.NEXT_PUBLIC_APP_NAME || 'MindCare',
+  name: process.env.NEXT_PUBLIC_APP_NAME || 'PsicoLink',
   tagline:
     process.env.NEXT_PUBLIC_APP_TAGLINE ||
     'Sua Jornada de Bem-Estar Mental',

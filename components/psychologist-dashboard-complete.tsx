@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, KeyboardEvent } from 'react'
-import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, MessageCircle, Check, X, Phone, Stethoscope, TrendingUp } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Phone, Stethoscope, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { appConfig } from '@/lib/app-config'
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
 
@@ -51,8 +50,9 @@ interface Appointment {
   status: AppointmentStatus
   notes: string
   date: Date
-  notificationPreference: 'whatsapp' | 'email'
+  notificationPreference: 'email'
   patientContact: string
+  meetingUrl?: string
 }
 
 interface Reminder {
@@ -78,7 +78,13 @@ type ApiPatientProfile = Omit<PatientProfile, 'medicalRecords'> & {
   medicalRecords: ApiMedicalRecord[]
 }
 type ApiAppointment = Omit<Appointment, 'date'> & { date: string }
+type GoogleStatusPayload = {
+  connected: boolean
+  email?: string
+  connectedAt?: string | null
+}
 type DashboardPayload = {
+  google?: GoogleStatusPayload
   patients: ApiPatientProfile[]
   appointments: ApiAppointment[]
   reminders: Reminder[]
@@ -94,6 +100,8 @@ const hydrateDashboard = (payload: DashboardPayload) => ({
   })),
   appointments: payload.appointments.map((appointment) => ({
     ...appointment,
+    notificationPreference: 'email',
+    meetingUrl: appointment.meetingUrl || '',
     date: new Date(appointment.date),
   })),
   reminders: payload.reminders,
@@ -133,7 +141,7 @@ export function PsychologistDashboard({
     duration: '50 min',
     date: new Date(),
     notes: '',
-    notificationPreference: 'whatsapp' as 'whatsapp' | 'email',
+    notificationPreference: 'email' as 'email',
     patientContact: '',
     patientEmail: '',
     patientPhone: '',
@@ -149,6 +157,9 @@ export function PsychologistDashboard({
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatusPayload | null>(null)
+  const [googleConnectError, setGoogleConnectError] = useState('')
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false)
 
   const loadDashboard = useCallback(async () => {
     if (!psychologistId) return
@@ -165,6 +176,7 @@ export function PsychologistDashboard({
       setPatientProfiles(hydrated.patients)
       setAppointments(hydrated.appointments)
       setReminders(hydrated.reminders)
+      setGoogleStatus(data.google ?? { connected: false })
       setViewingPatient((current) =>
         current
           ? hydrated.patients.find((patient) => patient.id === current.id) ?? null
@@ -191,6 +203,10 @@ export function PsychologistDashboard({
     apt.patientName.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const googleConnectedAtLabel = googleStatus?.connectedAt
+    ? new Date(googleStatus.connectedAt).toLocaleDateString('pt-BR')
+    : ''
+
   const handleSaveAppointment = async () => {
     if (!editingAppointment || !psychologistId) return
 
@@ -206,7 +222,7 @@ export function PsychologistDashboard({
             duration: editingAppointment.duration,
             status: editingAppointment.status,
             notes: editingAppointment.notes,
-            notificationPreference: editingAppointment.notificationPreference,
+            notificationPreference: 'email',
             patientContact: editingAppointment.patientContact,
           }),
         },
@@ -233,7 +249,7 @@ export function PsychologistDashboard({
       duration: '50 min',
       date: new Date(),
       notes: '',
-      notificationPreference: 'whatsapp',
+      notificationPreference: 'email',
       patientContact: '',
       patientEmail: '',
       patientPhone: '',
@@ -265,10 +281,12 @@ export function PsychologistDashboard({
       return
     }
 
-    const patientContact =
-      newAppointment.notificationPreference === 'whatsapp'
-        ? newAppointment.patientPhone
-        : newAppointment.patientEmail
+    if (!newAppointment.patientEmail.trim()) {
+      alert('Informe o email do paciente.')
+      return
+    }
+
+    const patientContact = newAppointment.patientEmail.trim()
 
     try {
       const response = await fetch(
@@ -282,7 +300,7 @@ export function PsychologistDashboard({
             patientPhone: newAppointment.patientPhone,
             duration: newAppointment.duration,
             notes: newAppointment.notes,
-            notificationPreference: newAppointment.notificationPreference,
+            notificationPreference: 'email',
             patientContact,
             slots: slotsToSchedule.map((slot) => ({
               date: formatDateForApi(slot.date),
@@ -326,16 +344,69 @@ export function PsychologistDashboard({
     }
   }
 
-  const handleStartCall = (appointment: Appointment) => {
-    const preference = appointment.notificationPreference
+  const handleStartCall = async (appointment: Appointment) => {
+    if (!psychologistId) return
     const contact = appointment.patientContact
-    const baseUrl = appConfig.videoBaseUrl.replace(/\/$/, '')
-    const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${baseUrl}/${appointment.id}`
-    
-    if (preference === 'whatsapp') {
-      alert(`✓ Notificação enviada via WhatsApp para ${contact}\n\nMensagem: ${message}`)
-    } else {
-      alert(`✓ Email enviado para ${contact}\n\nAssunto: Sua consulta está iniciando\n\n${message}`)
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/appointments/${appointment.id}/notify`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      )
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Erro ao enviar notificação.')
+      }
+
+      const data = await response.json().catch(() => ({}))
+      const resolvedContact = data.contact || contact
+      const label = 'Email'
+      const prefix = data.mocked ? '✓ Notificação simulada' : '✓ Notificação enviada'
+      const meetingUrl = data.meetingUrl || appointment.meetingUrl
+      if (!meetingUrl) {
+        throw new Error('Link do Google Meet não encontrado.')
+      }
+      const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${meetingUrl}`
+
+      alert(`${prefix} via ${label} para ${resolvedContact}\n\nMensagem: ${message}`)
+
+      if (meetingUrl) {
+        window.open(meetingUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (error: any) {
+      console.error(error)
+      alert(error.message || 'Erro ao enviar notificação.')
+    }
+  }
+
+  const handleConnectGoogle = async () => {
+    if (!psychologistId) return
+    setIsConnectingGoogle(true)
+    setGoogleConnectError('')
+
+    try {
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/google/authorize`,
+      )
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Erro ao iniciar conexão com o Google.')
+      }
+      const data = await response.json()
+      if (!data?.url) {
+        throw new Error('URL de autorização não encontrada.')
+      }
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch (error: any) {
+      console.error(error)
+      setGoogleConnectError(error.message || 'Erro ao conectar Google Calendar.')
+    } finally {
+      setIsConnectingGoogle(false)
     }
   }
 
@@ -1059,20 +1130,10 @@ export function PsychologistDashboard({
 
                         <div className="space-y-2">
                           <Label htmlFor="new-notification">Preferência de Notificação</Label>
-                          <Select
-                            value={newAppointment.notificationPreference}
-                            onValueChange={(value: 'whatsapp' | 'email') =>
-                              setNewAppointment({ ...newAppointment, notificationPreference: value })
-                            }
-                          >
-                            <SelectTrigger id="new-notification">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                              <SelectItem value="email">Email</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            Email
+                          </div>
                         </div>
 
                         <div className="space-y-2">
@@ -1162,12 +1223,8 @@ export function PsychologistDashboard({
                                     <span>{appointment.duration}</span>
                                     <span>•</span>
                                     <span className="flex items-center gap-1">
-                                      {appointment.notificationPreference === 'whatsapp' ? (
-                                        <MessageCircle className="h-3.5 w-3.5" />
-                                      ) : (
-                                        <Mail className="h-3.5 w-3.5" />
-                                      )}
-                                      {appointment.notificationPreference === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                                      <Mail className="h-3.5 w-3.5" />
+                                      Email
                                     </span>
                                   </div>
                                 </div>
@@ -1217,7 +1274,10 @@ export function PsychologistDashboard({
                                       size="sm"
                                       className="gap-2 bg-transparent"
                                       onClick={() => {
-                                        setEditingAppointment(appointment)
+                                        setEditingAppointment({
+                                          ...appointment,
+                                          notificationPreference: 'email',
+                                        })
                                         setIsEditDialogOpen(true)
                                       }}
                                     >
@@ -1305,23 +1365,10 @@ export function PsychologistDashboard({
 
                                         <div className="space-y-2">
                                           <Label htmlFor="edit-notification">Preferência de Notificação</Label>
-                                          <Select
-                                            value={editingAppointment.notificationPreference}
-                                            onValueChange={(value: 'whatsapp' | 'email') =>
-                                              setEditingAppointment({
-                                                ...editingAppointment,
-                                                notificationPreference: value,
-                                              })
-                                            }
-                                          >
-                                            <SelectTrigger id="edit-notification">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                                              <SelectItem value="email">Email</SelectItem>
-                                            </SelectContent>
-                                          </Select>
+                                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                                            <Mail className="h-4 w-4" />
+                                            Email
+                                          </div>
                                         </div>
 
                                         <div className="space-y-2">
@@ -1375,6 +1422,45 @@ export function PsychologistDashboard({
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Google Calendar */}
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-foreground text-base">Google Calendar</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Gere links do Meet automaticamente nas consultas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {googleStatus?.connected ? (
+                    <div className="text-sm text-emerald-600">
+                      Conectado{googleStatus.email ? `: ${googleStatus.email}` : ''}
+                      {googleConnectedAtLabel ? ` em ${googleConnectedAtLabel}` : ''}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Ainda não conectado.
+                    </div>
+                  )}
+                  {googleConnectError && (
+                    <p className="text-xs text-destructive">{googleConnectError}</p>
+                  )}
+                  <Button
+                    variant={googleStatus?.connected ? 'outline' : 'default'}
+                    className="w-full"
+                    onClick={handleConnectGoogle}
+                    disabled={isConnectingGoogle || !psychologistId}
+                  >
+                    {isConnectingGoogle
+                      ? 'Conectando...'
+                      : googleStatus?.connected
+                        ? 'Reconectar Google'
+                        : 'Conectar Google Calendar'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Calendar Widget */}
             <Card className="border-border/50">
               <CardHeader>
@@ -1901,7 +1987,7 @@ export function PsychologistDashboard({
                         </div>
                         <Separator />
                         <div className="flex items-start gap-3">
-                          <MessageCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1 space-y-1">
                             <p className="text-xs text-muted-foreground">Contato de Emergência</p>
                             {editingField === 'basicInfo.emergencyContact' ? (

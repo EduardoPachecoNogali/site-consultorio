@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveRouteParams } from '@/lib/route-params'
 
 interface Params {
-  params: { id: string; patientId: string; recordId: string }
+  params?: { id?: string; patientId?: string; recordId?: string } | Promise<{ id?: string; patientId?: string; recordId?: string }>
 }
 
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
 export async function PATCH(request: Request, { params }: Params) {
-  const { id, patientId, recordId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const patientId = resolvedParams?.patientId
+  const recordId = resolvedParams?.recordId
+  if (!id || !patientId || !recordId) {
+    return NextResponse.json(
+      { error: 'Prontuário inválido.' },
+      { status: 400 },
+    )
+  }
   const payload = await request.json()
 
   const record = await prisma.medicalRecord.findFirst({
@@ -58,7 +68,16 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const { id, patientId, recordId } = params
+  const resolvedParams = await resolveRouteParams(params)
+  const id = resolvedParams?.id
+  const patientId = resolvedParams?.patientId
+  const recordId = resolvedParams?.recordId
+  if (!id || !patientId || !recordId) {
+    return NextResponse.json(
+      { error: 'Prontuário inválido.' },
+      { status: 400 },
+    )
+  }
 
   const record = await prisma.medicalRecord.findFirst({
     where: { id: recordId, patientId },

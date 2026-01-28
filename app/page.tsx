@@ -3,20 +3,21 @@
 import { useState } from 'react'
 import { AuthScreen } from '@/components/auth-screen'
 import { PatientDashboard } from '@/components/patient-dashboard'
-import { VideoConsultation } from '@/components/video-consultation'
 import { PsychologistDashboard } from '@/components/psychologist-dashboard-complete'
 import { PsychologistProfile } from '@/lib/psychologists'
 import { appConfig } from '@/lib/app-config'
 
-type ViewType = 'auth' | 'dashboard' | 'video' | 'psychologist'
+type ViewType = 'auth' | 'dashboard' | 'psychologist'
 
 export default function Page() {
   const [currentView, setCurrentView] = useState<ViewType>('auth')
   const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
   const [psychologistId, setPsychologistId] = useState<string | null>(null)
 
-  const handleLogin = (name: string) => {
+  const handleLogin = (name: string, email: string) => {
     setUserName(name)
+    setUserEmail(email)
     setCurrentView('dashboard')
   }
 
@@ -28,16 +29,13 @@ export default function Page() {
     setCurrentView('psychologist')
   }
 
-  const handleJoinCall = () => {
-    setCurrentView('video')
-  }
-
-  const handleEndCall = () => {
-    setCurrentView('dashboard')
+  const handleJoinCall = (meetingUrl: string) => {
+    window.open(meetingUrl, '_blank', 'noopener,noreferrer')
   }
 
   const handleLogout = () => {
     setUserName('')
+    setUserEmail('')
     setPsychologistId(null)
     setCurrentView('auth')
   }
@@ -53,11 +51,11 @@ export default function Page() {
       {currentView === 'dashboard' && (
         <PatientDashboard 
           userName={userName} 
+          userEmail={userEmail}
           onJoinCall={handleJoinCall}
           onLogout={handleLogout}
         />
       )}
-      {currentView === 'video' && <VideoConsultation onEndCall={handleEndCall} />}
       {currentView === 'psychologist' && (
         <PsychologistDashboard
           psychologistName={userName}
