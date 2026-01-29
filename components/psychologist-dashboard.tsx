@@ -35,6 +35,13 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
   const [searchQuery, setSearchQuery] = useState('')
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [availability, setAvailability] = useState({
+    start: '09:00',
+    lunchStart: '12:00',
+    lunchEnd: '13:00',
+    end: '18:00',
+    intervalMinutes: 10,
+  })
   
   const [appointments, setAppointments] = useState<Appointment[]>([])
 
@@ -388,6 +395,79 @@ export function PsychologistDashboard({ psychologistName, onLogout }: Psychologi
 
           {/* Sidebar - Calendar & Quick Actions */}
           <div className="lg:col-span-1 space-y-6">
+            {/* Availability */}
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-foreground">Disponibilidade</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Defina início, almoço, retorno e fechamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="availability-start">Início</Label>
+                  <Input
+                    id="availability-start"
+                    type="time"
+                    value={availability.start}
+                    onChange={(e) =>
+                      setAvailability({ ...availability, start: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-lunch-start">Almoço</Label>
+                    <Input
+                      id="availability-lunch-start"
+                      type="time"
+                      value={availability.lunchStart}
+                      onChange={(e) =>
+                        setAvailability({ ...availability, lunchStart: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-lunch-end">Retorno</Label>
+                    <Input
+                      id="availability-lunch-end"
+                      type="time"
+                      value={availability.lunchEnd}
+                      onChange={(e) =>
+                        setAvailability({ ...availability, lunchEnd: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="availability-end">Fechamento</Label>
+                  <Input
+                    id="availability-end"
+                    type="time"
+                    value={availability.end}
+                    onChange={(e) =>
+                      setAvailability({ ...availability, end: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="availability-interval">Intervalo entre consultas (min)</Label>
+                  <Input
+                    id="availability-interval"
+                    type="number"
+                    min={0}
+                    value={availability.intervalMinutes}
+                    onChange={(e) =>
+                      setAvailability({
+                        ...availability,
+                        intervalMinutes: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Calendar Widget */}
             <Card className="border-border/50">
               <CardHeader>

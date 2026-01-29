@@ -49,6 +49,16 @@ export async function PATCH(request: Request, { params }: Params) {
     duration?: string
     status?: string
     notes?: string | null
+    reason?: string | null
+    isGroup?: boolean
+    groupName?: string | null
+    groupSize?: number | null
+    groupParticipants?: string[]
+    groupRequested?: boolean
+    groupRequestNote?: string | null
+    attendanceStatus?: string
+    tags?: string[]
+    groupTags?: string[]
     notificationPreference?: string
     patientContact?: string
   } = {}
@@ -67,6 +77,88 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   if (payload.notes !== undefined) {
     updateData.notes = normalizeString(payload.notes) || null
+  }
+  if (payload.reason !== undefined) {
+    updateData.reason = normalizeString(payload.reason) || null
+  }
+  if (payload.isGroup !== undefined) {
+    updateData.isGroup = Boolean(payload.isGroup)
+  }
+  if (payload.groupName !== undefined) {
+    updateData.groupName = normalizeString(payload.groupName) || null
+  }
+  if (payload.groupSize !== undefined) {
+    const parsedSize = Number(payload.groupSize)
+    updateData.groupSize = Number.isFinite(parsedSize) ? parsedSize : null
+  }
+  if (payload.groupParticipants !== undefined) {
+    updateData.groupParticipants = Array.isArray(payload.groupParticipants)
+      ? payload.groupParticipants.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+      : []
+  }
+  if (payload.groupRequested !== undefined) {
+    updateData.groupRequested = Boolean(payload.groupRequested)
+  }
+  if (payload.groupRequestNote !== undefined) {
+    updateData.groupRequestNote = normalizeString(payload.groupRequestNote) || null
+  }
+  if (payload.attendanceStatus !== undefined) {
+    updateData.attendanceStatus = normalizeString(payload.attendanceStatus) || 'pending'
+  }
+  if (payload.tags !== undefined) {
+    updateData.tags = Array.isArray(payload.tags)
+      ? payload.tags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+      : []
+  }
+  if (payload.groupTags !== undefined) {
+    updateData.groupTags = Array.isArray(payload.groupTags)
+      ? payload.groupTags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+      : []
+  }
+
+  if (payload.isGroup === false) {
+    updateData.groupName = null
+    updateData.groupSize = null
+    updateData.groupParticipants = []
+    updateData.groupTags = []
+  }
+
+  if (payload.isGroup === true) {
+    updateData.groupRequested = false
+    if (updateData.groupRequestNote === undefined) {
+      updateData.groupRequestNote = null
+    }
+  }
+
+  const desiredIsGroup = updateData.isGroup ?? appointment.isGroup
+  const desiredDate = updateData.date ?? appointment.date
+  const desiredTime = updateData.time ?? appointment.time
+  const desiredGroupName = updateData.groupName ?? appointment.groupName
+
+  if (!desiredIsGroup) {
+    const conflict = await prisma.appointment.findFirst({
+      where: {
+        psychologistId: id,
+        id: { not: appointmentId },
+        date: desiredDate,
+        time: desiredTime,
+        status: { notIn: ['cancelled'] },
+      },
+    })
+
+    if (conflict) {
+      return NextResponse.json(
+        { error: 'Horário indisponível para consulta individual.' },
+        { status: 409 },
+      )
+    }
+  }
+
+  if (desiredIsGroup && !desiredGroupName) {
+    return NextResponse.json(
+      { error: 'Informe o nome do grupo.' },
+      { status: 400 },
+    )
   }
   if (payload.notificationPreference !== undefined) {
     updateData.notificationPreference = 'email'
@@ -101,6 +193,16 @@ export async function PATCH(request: Request, { params }: Params) {
       duration: updated.duration,
       status: updated.status,
       notes: updated.notes ?? '',
+      reason: updated.reason ?? '',
+      isGroup: updated.isGroup ?? false,
+      groupName: updated.groupName ?? '',
+      groupSize: updated.groupSize ?? null,
+      groupParticipants: updated.groupParticipants ?? [],
+      groupRequested: updated.groupRequested ?? false,
+      groupRequestNote: updated.groupRequestNote ?? '',
+      attendanceStatus: updated.attendanceStatus ?? 'pending',
+      tags: updated.tags ?? [],
+      groupTags: updated.groupTags ?? [],
       date: updated.date.toISOString(),
       notificationPreference: updated.notificationPreference,
       patientContact: updated.patientContact,

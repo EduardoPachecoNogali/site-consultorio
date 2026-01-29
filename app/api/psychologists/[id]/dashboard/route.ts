@@ -58,7 +58,17 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
   }
 
-  const psychologist = await prisma.psychologist.findUnique({ where: { id } })
+  const psychologist = await prisma.psychologist.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      googleRefreshToken: true,
+      googleEmail: true,
+      googleConnectedAt: true,
+      email: true,
+      availability: true,
+    },
+  })
   if (!psychologist) {
     return NextResponse.json(
       { error: 'Profissional não encontrado.' },
@@ -109,6 +119,7 @@ export async function GET(request: Request, { params }: Params) {
         date: record.date.toISOString(),
         title: record.title,
         content: record.content,
+        tags: record.tags ?? [],
       })),
       basicInfo: {
         age: patient.age ?? undefined,
@@ -126,6 +137,16 @@ export async function GET(request: Request, { params }: Params) {
     duration: appointment.duration,
     status: appointment.status,
     notes: appointment.notes ?? '',
+    reason: appointment.reason ?? '',
+    isGroup: appointment.isGroup ?? false,
+    groupName: appointment.groupName ?? '',
+    groupSize: appointment.groupSize ?? null,
+    groupParticipants: appointment.groupParticipants ?? [],
+    groupRequested: appointment.groupRequested ?? false,
+    groupRequestNote: appointment.groupRequestNote ?? '',
+    attendanceStatus: appointment.attendanceStatus ?? 'pending',
+    tags: appointment.tags ?? [],
+    groupTags: appointment.groupTags ?? [],
     date: appointment.date.toISOString(),
     notificationPreference: appointment.notificationPreference,
     patientContact: appointment.patientContact,
@@ -136,6 +157,7 @@ export async function GET(request: Request, { params }: Params) {
     id: reminder.id,
     text: reminder.text,
     color: reminder.color,
+    remindAt: reminder.remindAt ? reminder.remindAt.toISOString() : null,
   }))
 
   return NextResponse.json({
@@ -146,6 +168,7 @@ export async function GET(request: Request, { params }: Params) {
         ? psychologist.googleConnectedAt.toISOString()
         : null,
     },
+    availability: psychologist.availability ?? null,
     patients: serializedPatients,
     appointments: serializedAppointments,
     reminders: serializedReminders,

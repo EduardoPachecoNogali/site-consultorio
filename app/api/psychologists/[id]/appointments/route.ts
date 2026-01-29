@@ -45,6 +45,22 @@ export async function POST(request: Request, { params }: Params) {
   const patientPhone = normalizeString(payload.patientPhone)
   const duration = normalizeString(payload.duration) || '50 min'
   const notes = normalizeString(payload.notes)
+  const reason = normalizeString(payload.reason)
+  const createdBy = normalizeString(payload.createdBy)
+  const groupRequested = Boolean(payload.groupRequested)
+  const groupRequestNote = normalizeString(payload.groupRequestNote)
+  const isGroup = Boolean(payload.isGroup) && !groupRequested
+  const groupName = normalizeString(payload.groupName)
+  const groupSize = Number(payload.groupSize)
+  const groupParticipants = Array.isArray(payload.groupParticipants)
+    ? payload.groupParticipants.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+    : []
+  const tags = Array.isArray(payload.tags)
+    ? payload.tags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+    : []
+  const groupTags = Array.isArray(payload.groupTags)
+    ? payload.groupTags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+    : []
   const notificationPreference = 'email'
   const resolvedContact = patientEmail
 
@@ -84,6 +100,45 @@ export async function POST(request: Request, { params }: Params) {
       { error: 'Profissional não encontrado.' },
       { status: 404 },
     )
+  }
+
+  if (isGroup && createdBy !== 'psychologist') {
+    return NextResponse.json(
+      { error: 'Somente o psicólogo pode criar grupo.' },
+      { status: 403 },
+    )
+  }
+
+  if (isGroup && !groupName) {
+    return NextResponse.json(
+      { error: 'Informe o nome do grupo.' },
+      { status: 400 },
+    )
+  }
+
+  if (!isGroup) {
+    const normalizedSlots = slots.map((slot: { date: string; time: string }) => ({
+      date: normalizeDate(slot.date),
+      time: slot.time,
+    }))
+
+    const conflict = await prisma.appointment.findFirst({
+      where: {
+        psychologistId: id,
+        status: { notIn: ['cancelled'] },
+        OR: normalizedSlots.map((slot) => ({
+          date: slot.date,
+          time: slot.time,
+        })),
+      },
+    })
+
+    if (conflict) {
+      return NextResponse.json(
+        { error: 'Horário indisponível para consulta individual.' },
+        { status: 409 },
+      )
+    }
   }
 
   const patientLookup = patientEmail
@@ -142,6 +197,16 @@ export async function POST(request: Request, { params }: Params) {
           duration,
           status: 'upcoming',
           notes: notes || null,
+          reason: reason || null,
+          isGroup,
+          groupName: isGroup ? groupName || null : null,
+          groupSize: isGroup && Number.isFinite(groupSize) ? groupSize : null,
+          groupParticipants: isGroup ? groupParticipants : [],
+          groupRequested,
+          groupRequestNote: groupRequested ? groupRequestNote || null : null,
+          attendanceStatus: 'pending',
+          tags,
+          groupTags: isGroup ? groupTags : [],
           notificationPreference,
           patientContact: resolvedContact,
         },
@@ -198,6 +263,16 @@ export async function POST(request: Request, { params }: Params) {
         duration: appointment.duration,
         status: appointment.status,
         notes: appointment.notes ?? '',
+        reason: appointment.reason ?? '',
+        isGroup: appointment.isGroup,
+        groupName: appointment.groupName ?? '',
+        groupSize: appointment.groupSize ?? null,
+        groupParticipants: appointment.groupParticipants ?? [],
+        groupRequested: appointment.groupRequested ?? false,
+        groupRequestNote: appointment.groupRequestNote ?? '',
+        attendanceStatus: appointment.attendanceStatus ?? 'pending',
+        tags: appointment.tags ?? [],
+        groupTags: appointment.groupTags ?? [],
         date: appointment.date.toISOString(),
         notificationPreference: appointment.notificationPreference,
         patientContact: appointment.patientContact,

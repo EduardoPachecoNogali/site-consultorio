@@ -38,6 +38,7 @@ export async function PATCH(request: Request, { params }: Params) {
     title?: string
     content?: string
     date?: Date
+    tags?: string[]
   } = {}
 
   if (payload.title !== undefined) {
@@ -51,6 +52,11 @@ export async function PATCH(request: Request, { params }: Params) {
   if (payload.date) {
     updateData.date = new Date(payload.date)
   }
+  if (payload.tags !== undefined) {
+    updateData.tags = Array.isArray(payload.tags)
+      ? payload.tags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+      : []
+  }
 
   const updated = await prisma.medicalRecord.update({
     where: { id: recordId },
@@ -63,6 +69,7 @@ export async function PATCH(request: Request, { params }: Params) {
       date: updated.date.toISOString(),
       title: updated.title,
       content: updated.content,
+      tags: updated.tags ?? [],
     },
   })
 }

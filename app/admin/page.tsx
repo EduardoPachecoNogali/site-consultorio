@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { ShieldCheck } from 'lucide-react'
+import { Mail, ShieldCheck } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
 import { PsychologistProfile } from '@/lib/psychologists'
 
@@ -24,9 +24,12 @@ export default function AdminPsychologistsPage() {
   const [loginError, setLoginError] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [psychologistRequests, setPsychologistRequests] = useState<PsychologistProfile[]>([])
+  const [approvedPsychologists, setApprovedPsychologists] = useState<PsychologistProfile[]>([])
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
   const [requestsError, setRequestsError] = useState('')
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resendFeedback, setResendFeedback] = useState('')
 
   const [newPsychologist, setNewPsychologist] = useState<NewPsychologistForm>({
     name: '',
@@ -60,7 +63,11 @@ export default function AdminPsychologistsPage() {
       const pending = (data.psychologists || []).filter(
         (psychologist: PsychologistProfile) => psychologist.status === 'pending',
       )
+      const approved = (data.psychologists || []).filter(
+        (psychologist: PsychologistProfile) => psychologist.status === 'approved',
+      )
       setPsychologistRequests(pending)
+      setApprovedPsychologists(approved)
     } catch (error: any) {
       setRequestsError(error.message || 'Não foi possível carregar as solicitações.')
     } finally {
@@ -184,6 +191,25 @@ export default function AdminPsychologistsPage() {
     }
   }
 
+  const handleResendInvite = async (psychologistId: string) => {
+    try {
+      setResendingId(psychologistId)
+      setResendFeedback('')
+      const response = await fetch(`/api/psychologists/${psychologistId}/resend-pin`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Não foi possível reenviar o convite.')
+      }
+      setResendFeedback('Convite reenviado com sucesso.')
+    } catch (error: any) {
+      setResendFeedback(error.message || 'Não foi possível reenviar o convite.')
+    } finally {
+      setResendingId(null)
+    }
+  }
+
   if (isCheckingAuth) {
     return (
       <main className="min-h-screen bg-background p-6">
@@ -288,6 +314,55 @@ export default function AdminPsychologistsPage() {
                       disabled={approvingId === psychologist.id}
                     >
                       {approvingId === psychologist.id ? 'Aprovando...' : 'Aprovar e enviar convite'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Convites enviados</CardTitle>
+            <CardDescription>
+              Reenvie o email de cadastro para profissionais aprovados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoadingRequests && (
+              <p className="text-sm text-muted-foreground">Carregando profissionais...</p>
+            )}
+            {resendFeedback && (
+              <p className="text-sm text-muted-foreground">{resendFeedback}</p>
+            )}
+            {!isLoadingRequests && approvedPsychologists.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhum convite aprovado no momento.
+              </p>
+            )}
+            {approvedPsychologists.length > 0 && (
+              <div className="space-y-3">
+                {approvedPsychologists.map((psychologist) => (
+                  <div
+                    key={psychologist.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {psychologist.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{psychologist.email}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => handleResendInvite(psychologist.id)}
+                      disabled={resendingId === psychologist.id}
+                    >
+                      <Mail className="h-4 w-4" />
+                      {resendingId === psychologist.id ? 'Reenviando...' : 'Reenviar email'}
                     </Button>
                   </div>
                 ))}

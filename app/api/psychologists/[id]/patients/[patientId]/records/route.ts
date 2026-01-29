@@ -34,6 +34,9 @@ export async function POST(request: Request, { params }: Params) {
 
   const title = normalizeString(payload.title)
   const content = normalizeString(payload.content)
+  const tags = Array.isArray(payload.tags)
+    ? payload.tags.map((entry: unknown) => normalizeString(entry)).filter(Boolean)
+    : []
 
   if (!title || !content) {
     return NextResponse.json(
@@ -47,6 +50,7 @@ export async function POST(request: Request, { params }: Params) {
       patientId,
       title,
       content,
+      tags,
       date: payload.date ? new Date(payload.date) : new Date(),
     },
   })
@@ -58,6 +62,7 @@ export async function POST(request: Request, { params }: Params) {
         date: record.date.toISOString(),
         title: record.title,
         content: record.content,
+        tags: record.tags ?? [],
       },
     },
     { status: 201 },

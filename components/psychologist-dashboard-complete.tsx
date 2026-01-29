@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, KeyboardEvent } from 'react'
-import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Phone, Stethoscope, TrendingUp } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, KeyboardEvent } from 'react'
+import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Phone, Stethoscope, TrendingUp, Users, Tag, CalendarClock, AlertCircle, CheckCircle2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,14 +15,17 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
+type AttendanceStatus = 'pending' | 'present' | 'absent' | 'excused'
 
 interface MedicalRecord {
   id: string
   date: Date
   title: string
   content: string
+  tags: string[]
 }
 
 interface PatientProfile {
@@ -49,6 +52,16 @@ interface Appointment {
   duration: string
   status: AppointmentStatus
   notes: string
+  reason: string
+  isGroup: boolean
+  groupName?: string
+  groupSize?: number | null
+  groupParticipants: string[]
+  groupRequested: boolean
+  groupRequestNote: string
+  attendanceStatus: AttendanceStatus
+  tags: string[]
+  groupTags: string[]
   date: Date
   notificationPreference: 'email'
   patientContact: string
@@ -59,6 +72,7 @@ interface Reminder {
   id: string
   text: string
   color: 'amber' | 'blue' | 'green' | 'red'
+  remindAt?: Date | null
 }
 
 interface AppointmentSlot {
@@ -78,16 +92,26 @@ type ApiPatientProfile = Omit<PatientProfile, 'medicalRecords'> & {
   medicalRecords: ApiMedicalRecord[]
 }
 type ApiAppointment = Omit<Appointment, 'date'> & { date: string }
+type ApiReminder = Omit<Reminder, 'remindAt'> & { remindAt?: string | null }
 type GoogleStatusPayload = {
   connected: boolean
   email?: string
   connectedAt?: string | null
 }
+type AvailabilityConfig = {
+  timezone: string
+  slotDurationMinutes: number
+  bufferMinutes: number
+  allowGroup: boolean
+  maxGroupSize: number
+  weekly: Record<number, { enabled: boolean; start: string; end: string }>
+}
 type DashboardPayload = {
   google?: GoogleStatusPayload
+  availability?: AvailabilityConfig | null
   patients: ApiPatientProfile[]
   appointments: ApiAppointment[]
-  reminders: Reminder[]
+  reminders: ApiReminder[]
 }
 
 const hydrateDashboard = (payload: DashboardPayload) => ({
@@ -95,6 +119,7 @@ const hydrateDashboard = (payload: DashboardPayload) => ({
     ...patient,
     medicalRecords: patient.medicalRecords.map((record) => ({
       ...record,
+      tags: record.tags ?? [],
       date: new Date(record.date),
     })),
   })),
@@ -102,10 +127,61 @@ const hydrateDashboard = (payload: DashboardPayload) => ({
     ...appointment,
     notificationPreference: 'email',
     meetingUrl: appointment.meetingUrl || '',
+    reason: appointment.reason || '',
+    isGroup: appointment.isGroup ?? false,
+    groupName: appointment.groupName || '',
+    groupSize: appointment.groupSize ?? null,
+    groupParticipants: appointment.groupParticipants ?? [],
+    groupRequested: appointment.groupRequested ?? false,
+    groupRequestNote: appointment.groupRequestNote ?? '',
+    attendanceStatus: appointment.attendanceStatus ?? 'pending',
+    tags: appointment.tags ?? [],
+    groupTags: appointment.groupTags ?? [],
     date: new Date(appointment.date),
   })),
-  reminders: payload.reminders,
+  reminders: payload.reminders.map((reminder) => ({
+    ...reminder,
+    remindAt: reminder.remindAt ? new Date(reminder.remindAt) : null,
+  })),
 })
+
+const DEFAULT_AVAILABILITY: AvailabilityConfig = {
+  timezone: 'America/Sao_Paulo',
+  slotDurationMinutes: 50,
+  bufferMinutes: 10,
+  allowGroup: false,
+  maxGroupSize: 6,
+  weekly: {
+    0: { enabled: false, start: '09:00', end: '17:00' },
+    1: { enabled: true, start: '09:00', end: '18:00' },
+    2: { enabled: true, start: '09:00', end: '18:00' },
+    3: { enabled: true, start: '09:00', end: '18:00' },
+    4: { enabled: true, start: '09:00', end: '18:00' },
+    5: { enabled: true, start: '09:00', end: '16:00' },
+    6: { enabled: false, start: '09:00', end: '12:00' },
+  },
+}
+
+const normalizeAvailability = (value?: AvailabilityConfig | null): AvailabilityConfig => {
+  if (!value) return DEFAULT_AVAILABILITY
+  const weekly: AvailabilityConfig['weekly'] = {}
+  for (let day = 0; day <= 6; day += 1) {
+    const entry = value.weekly?.[day] ?? DEFAULT_AVAILABILITY.weekly[day]
+    weekly[day] = {
+      enabled: entry?.enabled ?? DEFAULT_AVAILABILITY.weekly[day].enabled,
+      start: entry?.start ?? DEFAULT_AVAILABILITY.weekly[day].start,
+      end: entry?.end ?? DEFAULT_AVAILABILITY.weekly[day].end,
+    }
+  }
+  return {
+    timezone: value.timezone || DEFAULT_AVAILABILITY.timezone,
+    slotDurationMinutes: value.slotDurationMinutes ?? DEFAULT_AVAILABILITY.slotDurationMinutes,
+    bufferMinutes: value.bufferMinutes ?? DEFAULT_AVAILABILITY.bufferMinutes,
+    allowGroup: value.allowGroup ?? DEFAULT_AVAILABILITY.allowGroup,
+    maxGroupSize: value.maxGroupSize ?? DEFAULT_AVAILABILITY.maxGroupSize,
+    weekly,
+  }
+}
 
 const formatDateForApi = (date: Date) => {
   const year = date.getFullYear()
@@ -113,6 +189,12 @@ const formatDateForApi = (date: Date) => {
   const day = `${date.getDate()}`.padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+const parseTags = (value: string) =>
+  value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
 
 export function PsychologistDashboard({
   psychologistName,
@@ -129,10 +211,12 @@ export function PsychologistDashboard({
   const [isAddReminderOpen, setIsAddReminderOpen] = useState(false)
   const [newReminderText, setNewReminderText] = useState('')
   const [newReminderColor, setNewReminderColor] = useState<'amber' | 'blue' | 'green' | 'red'>('blue')
+  const [newReminderDate, setNewReminderDate] = useState<Date | null>(null)
   const [viewingPatient, setViewingPatient] = useState<PatientProfile | null>(null)
   const [isPatientProfileOpen, setIsPatientProfileOpen] = useState(false)
   const [newRecordTitle, setNewRecordTitle] = useState('')
   const [newRecordContent, setNewRecordContent] = useState('')
+  const [newRecordTags, setNewRecordTags] = useState('')
   
   // Novo formulário de consulta
   const [newAppointment, setNewAppointment] = useState({
@@ -141,6 +225,15 @@ export function PsychologistDashboard({
     duration: '50 min',
     date: new Date(),
     notes: '',
+    reason: '',
+    isGroup: false,
+    groupName: '',
+    groupSize: 2,
+    groupParticipants: [] as string[],
+    tags: [] as string[],
+    groupTags: [] as string[],
+    groupRequested: false,
+    groupRequestNote: '',
     notificationPreference: 'email' as 'email',
     patientContact: '',
     patientEmail: '',
@@ -157,15 +250,24 @@ export function PsychologistDashboard({
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionSuccess, setActionSuccess] = useState('')
   const [googleStatus, setGoogleStatus] = useState<GoogleStatusPayload | null>(null)
   const [googleConnectError, setGoogleConnectError] = useState('')
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false)
+  const [availability, setAvailability] = useState<AvailabilityConfig>(DEFAULT_AVAILABILITY)
+  const [availabilityError, setAvailabilityError] = useState('')
+  const [isSavingAvailability, setIsSavingAvailability] = useState(false)
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [reportPatientId, setReportPatientId] = useState('')
 
   const loadDashboard = useCallback(async () => {
     if (!psychologistId) return
     setIsLoading(true)
     setLoadError('')
     try {
+      console.log('[dashboard] carregando dados', { psychologistId })
       const response = await fetch(`/api/psychologists/${psychologistId}/dashboard`)
       if (!response.ok) {
         const data = await response.json()
@@ -177,6 +279,7 @@ export function PsychologistDashboard({
       setAppointments(hydrated.appointments)
       setReminders(hydrated.reminders)
       setGoogleStatus(data.google ?? { connected: false })
+      setAvailability(normalizeAvailability(data.availability))
       setViewingPatient((current) =>
         current
           ? hydrated.patients.find((patient) => patient.id === current.id) ?? null
@@ -211,6 +314,9 @@ export function PsychologistDashboard({
     if (!editingAppointment || !psychologistId) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] salvando consulta', editingAppointment.id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/appointments/${editingAppointment.id}`,
         {
@@ -222,8 +328,18 @@ export function PsychologistDashboard({
             duration: editingAppointment.duration,
             status: editingAppointment.status,
             notes: editingAppointment.notes,
+            reason: editingAppointment.reason,
+            isGroup: editingAppointment.isGroup,
+            groupName: editingAppointment.groupName,
+            groupSize: editingAppointment.groupSize,
+            groupParticipants: editingAppointment.groupParticipants,
+            attendanceStatus: editingAppointment.attendanceStatus,
+            tags: editingAppointment.tags,
+            groupTags: editingAppointment.groupTags,
             notificationPreference: 'email',
             patientContact: editingAppointment.patientContact,
+            groupRequested: editingAppointment.groupRequested,
+            groupRequestNote: editingAppointment.groupRequestNote,
           }),
         },
       )
@@ -234,11 +350,12 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Consulta atualizada com sucesso.')
       setIsEditDialogOpen(false)
       setEditingAppointment(null)
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao atualizar consulta.')
+      setActionError(error.message || 'Erro ao atualizar consulta.')
     }
   }
 
@@ -249,6 +366,15 @@ export function PsychologistDashboard({
       duration: '50 min',
       date: new Date(),
       notes: '',
+      reason: '',
+      isGroup: false,
+      groupName: '',
+      groupSize: 2,
+      groupParticipants: [],
+      tags: [],
+      groupTags: [],
+      groupRequested: false,
+      groupRequestNote: '',
       notificationPreference: 'email',
       patientContact: '',
       patientEmail: '',
@@ -278,17 +404,24 @@ export function PsychologistDashboard({
     })
 
     if (!normalizedName || slotsToSchedule.length === 0) {
+      setActionError('Informe o paciente e ao menos um horário.')
       return
     }
 
     if (!newAppointment.patientEmail.trim()) {
-      alert('Informe o email do paciente.')
+      setActionError('Informe o email do paciente.')
       return
     }
 
     const patientContact = newAppointment.patientEmail.trim()
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] criando consulta', {
+        patient: normalizedName,
+        slots: slotsToSchedule.length,
+      })
       const response = await fetch(
         `/api/psychologists/${psychologistId}/appointments`,
         {
@@ -300,6 +433,16 @@ export function PsychologistDashboard({
             patientPhone: newAppointment.patientPhone,
             duration: newAppointment.duration,
             notes: newAppointment.notes,
+            reason: newAppointment.reason,
+            isGroup: newAppointment.isGroup,
+            groupName: newAppointment.groupName,
+            groupSize: newAppointment.groupSize,
+            groupParticipants: newAppointment.groupParticipants,
+            tags: newAppointment.tags,
+            groupTags: newAppointment.groupTags,
+            groupRequested: newAppointment.groupRequested,
+            groupRequestNote: newAppointment.groupRequestNote,
+            createdBy: 'psychologist',
             notificationPreference: 'email',
             patientContact,
             slots: slotsToSchedule.map((slot) => ({
@@ -316,11 +459,12 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Consulta criada com sucesso.')
       setIsNewAppointmentOpen(false)
       resetNewAppointmentForm()
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao criar consulta.')
+      setActionError(error.message || 'Erro ao criar consulta.')
     }
   }
 
@@ -329,6 +473,9 @@ export function PsychologistDashboard({
     if (!confirm('Tem certeza que deseja excluir esta consulta?')) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] excluindo consulta', id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/appointments/${id}`,
         { method: 'DELETE' },
@@ -338,9 +485,10 @@ export function PsychologistDashboard({
         throw new Error(data.error || 'Erro ao excluir consulta.')
       }
       await loadDashboard()
+      setActionSuccess('Consulta excluída.')
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao excluir consulta.')
+      setActionError(error.message || 'Erro ao excluir consulta.')
     }
   }
 
@@ -349,6 +497,9 @@ export function PsychologistDashboard({
     const contact = appointment.patientContact
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] iniciando chamada', appointment.id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/appointments/${appointment.id}/notify`,
         {
@@ -373,14 +524,14 @@ export function PsychologistDashboard({
       }
       const message = `Olá ${appointment.patientName}, sua consulta está iniciando. Entre no link: ${meetingUrl}`
 
-      alert(`${prefix} via ${label} para ${resolvedContact}\n\nMensagem: ${message}`)
+      setActionSuccess(`${prefix} via ${label} para ${resolvedContact}.`)
 
       if (meetingUrl) {
         window.open(meetingUrl, '_blank', 'noopener,noreferrer')
       }
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao enviar notificação.')
+      setActionError(error.message || 'Erro ao enviar notificação.')
     }
   }
 
@@ -390,6 +541,7 @@ export function PsychologistDashboard({
     setGoogleConnectError('')
 
     try {
+      console.log('[dashboard] conectando google calendar', psychologistId)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/google/authorize`,
       )
@@ -448,6 +600,59 @@ export function PsychologistDashboard({
     setAdditionalSlots((slots) => slots.filter((slot) => slot.id !== slotId))
   }
 
+  const handleUpdateAvailability = (
+    day: number,
+    field: 'enabled' | 'start' | 'end',
+    value: boolean | string,
+  ) => {
+    setAvailability((current) => ({
+      ...current,
+      weekly: {
+        ...current.weekly,
+        [day]: {
+          ...current.weekly[day],
+          [field]: value,
+        },
+      },
+    }))
+  }
+
+  const handleSaveAvailability = async () => {
+    if (!psychologistId) return
+    setAvailabilityError('')
+    setIsSavingAvailability(true)
+    setActionError('')
+    setActionSuccess('')
+
+    try {
+      console.log('[dashboard] salvando disponibilidade', psychologistId)
+      const response = await fetch(
+        `/api/psychologists/${psychologistId}/availability`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ availability }),
+        },
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao salvar disponibilidade.')
+      }
+
+      const data = await response.json()
+      setAvailability(normalizeAvailability(data.availability))
+      setActionSuccess('Disponibilidade atualizada com sucesso.')
+    } catch (error: any) {
+      console.error(error)
+      const message = error.message || 'Erro ao salvar disponibilidade.'
+      setAvailabilityError(message)
+      setActionError(message)
+    } finally {
+      setIsSavingAvailability(false)
+    }
+  }
+
   const handleStartEditingField = (fieldId: string, currentValue?: string) => {
     setEditingField(fieldId)
     setEditingValue(currentValue ?? '')
@@ -486,6 +691,9 @@ export function PsychologistDashboard({
     if (!payload) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] atualizando paciente', editingField)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}`,
         {
@@ -501,9 +709,10 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Dados do paciente atualizados.')
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao atualizar paciente.')
+      setActionError(error.message || 'Erro ao atualizar paciente.')
     } finally {
       setEditingField(null)
       setEditingValue('')
@@ -526,6 +735,9 @@ export function PsychologistDashboard({
     if (!newRecordTitle || !newRecordContent) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] adicionando prontuário', viewingPatient.id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}/records`,
         {
@@ -534,6 +746,7 @@ export function PsychologistDashboard({
           body: JSON.stringify({
             title: newRecordTitle,
             content: newRecordContent,
+            tags: parseTags(newRecordTags),
           }),
         },
       )
@@ -544,11 +757,13 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Prontuário salvo com sucesso.')
       setNewRecordTitle('')
       setNewRecordContent('')
+      setNewRecordTags('')
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao salvar prontuário.')
+      setActionError(error.message || 'Erro ao salvar prontuário.')
     }
   }
 
@@ -570,6 +785,7 @@ export function PsychologistDashboard({
             title: editingRecord.title,
             content: editingRecord.content,
             date: editingRecord.date.toISOString(),
+            tags: editingRecord.tags,
           }),
         },
       )
@@ -580,11 +796,12 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Prontuário atualizado com sucesso.')
       setIsEditRecordDialogOpen(false)
       setEditingRecord(null)
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao atualizar prontuário.')
+      setActionError(error.message || 'Erro ao atualizar prontuário.')
     }
   }
 
@@ -593,6 +810,9 @@ export function PsychologistDashboard({
     if (!confirm('Deseja excluir este prontuário?')) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] excluindo prontuário', recordId)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/patients/${viewingPatient.id}/records/${recordId}`,
         { method: 'DELETE' },
@@ -604,9 +824,10 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Prontuário excluído.')
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao excluir prontuário.')
+      setActionError(error.message || 'Erro ao excluir prontuário.')
     }
   }
 
@@ -614,6 +835,9 @@ export function PsychologistDashboard({
     if (!editingReminder || !psychologistId) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] atualizando lembrete', editingReminder.id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/reminders/${editingReminder.id}`,
         {
@@ -622,6 +846,9 @@ export function PsychologistDashboard({
           body: JSON.stringify({
             text: editingReminder.text,
             color: editingReminder.color,
+            remindAt: editingReminder.remindAt
+              ? editingReminder.remindAt.toISOString()
+              : null,
           }),
         },
       )
@@ -632,11 +859,12 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Lembrete atualizado.')
       setIsReminderDialogOpen(false)
       setEditingReminder(null)
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao atualizar lembrete.')
+      setActionError(error.message || 'Erro ao atualizar lembrete.')
     }
   }
 
@@ -645,6 +873,9 @@ export function PsychologistDashboard({
     if (!newReminderText.trim()) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] adicionando lembrete')
       const response = await fetch(
         `/api/psychologists/${psychologistId}/reminders`,
         {
@@ -653,6 +884,7 @@ export function PsychologistDashboard({
           body: JSON.stringify({
             text: newReminderText,
             color: newReminderColor,
+            remindAt: newReminderDate ? newReminderDate.toISOString() : null,
           }),
         },
       )
@@ -663,12 +895,14 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Lembrete criado.')
       setNewReminderText('')
       setNewReminderColor('blue')
+      setNewReminderDate(null)
       setIsAddReminderOpen(false)
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao criar lembrete.')
+      setActionError(error.message || 'Erro ao criar lembrete.')
     }
   }
 
@@ -676,6 +910,9 @@ export function PsychologistDashboard({
     if (!psychologistId) return
 
     try {
+      setActionError('')
+      setActionSuccess('')
+      console.log('[dashboard] excluindo lembrete', id)
       const response = await fetch(
         `/api/psychologists/${psychologistId}/reminders/${id}`,
         { method: 'DELETE' },
@@ -687,10 +924,133 @@ export function PsychologistDashboard({
       }
 
       await loadDashboard()
+      setActionSuccess('Lembrete removido.')
     } catch (error: any) {
       console.error(error)
-      alert(error.message || 'Erro ao excluir lembrete.')
+      setActionError(error.message || 'Erro ao excluir lembrete.')
     }
+  }
+
+  const handleGenerateMonthlyReport = () => {
+    if (!reportPatient) {
+      setActionError('Selecione um paciente para gerar o relatório.')
+      return
+    }
+    if (!reportMonth) {
+      setActionError('Selecione o mês de referência do relatório.')
+      return
+    }
+
+    const [yearInput, monthInput] = reportMonth.split('-')
+    const year = Number(yearInput)
+    const monthIndex = Number(monthInput) - 1
+    if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) {
+      setActionError('Mês inválido para o relatório.')
+      return
+    }
+
+    const monthStart = new Date(year, monthIndex, 1)
+    const monthEnd = new Date(year, monthIndex + 1, 0, 23, 59, 59)
+
+    const monthAppointments = appointments.filter(
+      (appointment) =>
+        appointment.patientId === reportPatient.id &&
+        appointment.date >= monthStart &&
+        appointment.date <= monthEnd,
+    )
+
+    const completed = monthAppointments.filter((apt) => apt.status === 'completed').length
+    const absent = monthAppointments.filter((apt) => apt.attendanceStatus === 'absent').length
+    const present = monthAppointments.filter((apt) => apt.attendanceStatus === 'present').length
+
+    const monthRecords = reportPatient.medicalRecords.filter(
+      (record) => record.date >= monthStart && record.date <= monthEnd,
+    )
+
+    const reportWindow = window.open('', '_blank', 'width=900,height=700')
+    if (!reportWindow) {
+      setActionError('Não foi possível abrir a janela do relatório.')
+      return
+    }
+
+    const appointmentList = monthAppointments
+      .map(
+        (apt) => `
+        <li>
+          <strong>${apt.date.toLocaleDateString('pt-BR')}</strong> - ${apt.time} (${apt.duration})<br/>
+          <em>Status:</em> ${getStatusLabel(apt.status)} | <em>Presença:</em> ${apt.attendanceStatus}
+          ${apt.reason ? `<br/><em>Motivo:</em> ${apt.reason}` : ''}
+          ${apt.notes ? `<br/><em>Notas:</em> ${apt.notes}` : ''}
+        </li>
+      `,
+      )
+      .join('')
+
+    const recordList = monthRecords
+      .map(
+        (record) => `
+        <li>
+          <strong>${record.date.toLocaleDateString('pt-BR')}</strong> - ${record.title}
+          <p>${record.content.replace(/\n/g, '<br/>')}</p>
+        </li>
+      `,
+      )
+      .join('')
+
+    const html = `
+      <html>
+        <head>
+          <title>Relatório Mensal - ${reportPatient.name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; padding: 32px; }
+            h1, h2, h3 { color: #1f2937; }
+            .meta { display: flex; gap: 24px; margin-bottom: 16px; font-size: 14px; }
+            .card { border: 1px solid #e5e7eb; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+            ul { padding-left: 20px; }
+            li { margin-bottom: 12px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+            .summary div { background: #f9fafb; padding: 12px; border-radius: 10px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório Mensal</h1>
+          <div class="meta">
+            <div><strong>Paciente:</strong> ${reportPatient.name}</div>
+            <div><strong>Período:</strong> ${monthStart.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</div>
+            <div><strong>Psicólogo(a):</strong> ${psychologistName}</div>
+          </div>
+
+          <div class="card">
+            <h2>Resumo do Mês</h2>
+            <div class="summary">
+              <div><strong>${monthAppointments.length}</strong><br/>Sessões no mês</div>
+              <div><strong>${completed}</strong><br/>Concluídas</div>
+              <div><strong>${present}</strong><br/>Compareceu</div>
+            </div>
+            <div class="summary" style="margin-top: 12px;">
+              <div><strong>${absent}</strong><br/>Faltas</div>
+              <div><strong>${monthRecords.length}</strong><br/>Prontuários</div>
+              <div><strong>${reportPatient.upcomingAppointments}</strong><br/>Agendadas</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Progressão das Sessões</h2>
+            <ul>${appointmentList || '<li>Sem consultas registradas no período.</li>'}</ul>
+          </div>
+
+          <div class="card">
+            <h2>Prontuários e Anotações</h2>
+            <ul>${recordList || '<li>Sem prontuários registrados no período.</li>'}</ul>
+          </div>
+        </body>
+      </html>
+    `
+
+    reportWindow.document.write(html)
+    reportWindow.document.close()
+    reportWindow.focus()
+    reportWindow.print()
   }
 
   const getStatusColor = (status: AppointmentStatus) => {
@@ -755,6 +1115,75 @@ export function PsychologistDashboard({
     upcoming: todayAppointments.filter((a) => a.status === 'upcoming').length,
   }
 
+  const appointmentDates = useMemo(
+    () =>
+      appointments.map((appointment) => {
+        const date = new Date(appointment.date)
+        date.setHours(0, 0, 0, 0)
+        return date
+      }),
+    [appointments],
+  )
+
+  const reminderDates = useMemo(
+    () =>
+      reminders
+        .filter((reminder) => reminder.remindAt)
+        .map((reminder) => {
+          const date = new Date(reminder.remindAt as Date)
+          date.setHours(0, 0, 0, 0)
+          return date
+        }),
+    [reminders],
+  )
+
+  const calendarModifiers = useMemo(
+    () => ({
+      hasAppointment: appointmentDates,
+      hasReminder: reminderDates,
+    }),
+    [appointmentDates, reminderDates],
+  )
+
+  const reportPatient = useMemo(() => {
+    if (reportPatientId) {
+      return patientProfiles.find((patient) => patient.id === reportPatientId) ?? null
+    }
+    return viewingPatient
+  }, [patientProfiles, reportPatientId, viewingPatient])
+
+  const CalendarDayContent = ({
+    date,
+    activeModifiers,
+  }: {
+    date: Date
+    activeModifiers: { [key: string]: boolean }
+  }) => {
+    const day = date.getDate()
+    const hasAppointment = activeModifiers.hasAppointment
+    const hasReminder = activeModifiers.hasReminder
+
+    return (
+      <div className="flex flex-col items-center">
+        <span>{day}</span>
+        <span className="mt-1 flex items-center gap-1">
+          {hasAppointment && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+          {hasReminder && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+        </span>
+      </div>
+    )
+  }
+
+  const weekDays = [
+    { id: 0, label: 'Dom' },
+    { id: 1, label: 'Seg' },
+    { id: 2, label: 'Ter' },
+    { id: 3, label: 'Qua' },
+    { id: 4, label: 'Qui' },
+    { id: 5, label: 'Sex' },
+    { id: 6, label: 'Sáb' },
+  ]
+
   const patientNameQuery = newAppointment.patientName.trim().toLowerCase()
   const patientSuggestions =
     patientNameQuery.length >= 2
@@ -800,6 +1229,18 @@ export function PsychologistDashboard({
         {loadError && (
           <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
+          </div>
+        )}
+        {actionError && (
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4" />
+            <span>{actionError}</span>
+          </div>
+        )}
+        {actionSuccess && (
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
+            <CheckCircle2 className="mt-0.5 h-4 w-4" />
+            <span>{actionSuccess}</span>
           </div>
         )}
         {isLoading && (
@@ -888,6 +1329,8 @@ export function PsychologistDashboard({
                             mode="single"
                             selected={selectedDate}
                             onSelect={(date) => date && setSelectedDate(date)}
+                            modifiers={calendarModifiers}
+                            components={{ DayContent: CalendarDayContent }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -1006,6 +1449,81 @@ export function PsychologistDashboard({
                               placeholder="+55 11 99999-9999"
                             />
                           </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Consulta em grupo</p>
+                              <p className="text-xs text-muted-foreground">
+                                Ative para adicionar participantes e tags coletivas.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={newAppointment.isGroup}
+                              onCheckedChange={(checked) =>
+                                setNewAppointment({ ...newAppointment, isGroup: checked })
+                              }
+                            />
+                          </div>
+                          {newAppointment.isGroup && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label htmlFor="new-group-name">Nome do grupo</Label>
+                                <Input
+                                  id="new-group-name"
+                                  value={newAppointment.groupName}
+                                  onChange={(e) =>
+                                    setNewAppointment({ ...newAppointment, groupName: e.target.value })
+                                  }
+                                  placeholder="Ex: Grupo ansiedade"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="new-group-size">Tamanho do grupo</Label>
+                                <Input
+                                  id="new-group-size"
+                                  type="number"
+                                  min={2}
+                                  value={newAppointment.groupSize}
+                                  onChange={(e) =>
+                                    setNewAppointment({
+                                      ...newAppointment,
+                                      groupSize: Number(e.target.value),
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2 sm:col-span-2">
+                                <Label htmlFor="new-group-participants">Participantes (emails)</Label>
+                                <Input
+                                  id="new-group-participants"
+                                  value={newAppointment.groupParticipants.join(', ')}
+                                  onChange={(e) =>
+                                    setNewAppointment({
+                                      ...newAppointment,
+                                      groupParticipants: parseTags(e.target.value),
+                                    })
+                                  }
+                                  placeholder="email1@exemplo.com, email2@exemplo.com"
+                                />
+                              </div>
+                              <div className="space-y-2 sm:col-span-2">
+                                <Label htmlFor="new-group-tags">Tags do grupo</Label>
+                                <Input
+                                  id="new-group-tags"
+                                  value={newAppointment.groupTags.join(', ')}
+                                  onChange={(e) =>
+                                    setNewAppointment({
+                                      ...newAppointment,
+                                      groupTags: parseTags(e.target.value),
+                                    })
+                                  }
+                                  placeholder="ansiedade, suporte, terapia em grupo"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -1137,6 +1655,19 @@ export function PsychologistDashboard({
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="new-reason">Motivo da Consulta</Label>
+                          <Textarea
+                            id="new-reason"
+                            value={newAppointment.reason}
+                            onChange={(e) =>
+                              setNewAppointment({ ...newAppointment, reason: e.target.value })
+                            }
+                            placeholder="Descreva o motivo principal da consulta..."
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="new-notes">Notas</Label>
                           <Textarea
                             id="new-notes"
@@ -1146,6 +1677,18 @@ export function PsychologistDashboard({
                             }
                             placeholder="Observações sobre a consulta..."
                             rows={3}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="new-tags">Tags privadas</Label>
+                          <Input
+                            id="new-tags"
+                            value={newAppointment.tags.join(', ')}
+                            onChange={(e) =>
+                              setNewAppointment({ ...newAppointment, tags: parseTags(e.target.value) })
+                            }
+                            placeholder="ansiedade, acompanhamento, retorno"
                           />
                         </div>
                       </div>
@@ -1167,10 +1710,71 @@ export function PsychologistDashboard({
                     </DialogContent>
                   </Dialog>
 
-                  <Button variant="outline" className="gap-2 bg-transparent">
-                    <FileText className="h-4 w-4" />
-                    Relatórios
-                  </Button>
+                  <Dialog
+                    open={isReportDialogOpen}
+                    onOpenChange={(open) => {
+                      setIsReportDialogOpen(open)
+                      if (open && viewingPatient && !reportPatientId) {
+                        setReportPatientId(viewingPatient.id)
+                      }
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="gap-2 bg-transparent">
+                        <FileText className="h-4 w-4" />
+                        Relatórios
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Relatório mensal</DialogTitle>
+                        <DialogDescription>
+                          Gere um PDF com o resumo do mês e progressão das sessões.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="report-patient">Paciente</Label>
+                          <Select
+                            value={reportPatientId}
+                            onValueChange={(value) => setReportPatientId(value)}
+                          >
+                            <SelectTrigger id="report-patient">
+                              <SelectValue placeholder="Selecione um paciente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {patientProfiles.map((patient) => (
+                                <SelectItem key={patient.id} value={patient.id}>
+                                  {patient.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="report-month">Mês</Label>
+                          <Input
+                            id="report-month"
+                            type="month"
+                            value={reportMonth}
+                            onChange={(e) => setReportMonth(e.target.value)}
+                          />
+                        </div>
+                        <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+                          O relatório inclui sessões, presença, prontuários e anotações do mês selecionado.
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsReportDialogOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleGenerateMonthlyReport} className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Gerar PDF
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
@@ -1213,6 +1817,26 @@ export function PsychologistDashboard({
                                     >
                                       {getStatusLabel(appointment.status)}
                                     </Badge>
+                                    {appointment.isGroup && (
+                                      <Badge variant="outline" className="border-blue-500/30 text-blue-700">
+                                        <Users className="mr-1 h-3 w-3" />
+                                        Grupo
+                                      </Badge>
+                                    )}
+                                    {appointment.groupRequested && !appointment.isGroup && (
+                                      <Badge variant="outline" className="border-amber-500/30 text-amber-700">
+                                        Solicitação de grupo
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="border-border/50 text-muted-foreground">
+                                      {appointment.attendanceStatus === 'present'
+                                        ? 'Compareceu'
+                                        : appointment.attendanceStatus === 'absent'
+                                          ? 'Faltou'
+                                          : appointment.attendanceStatus === 'excused'
+                                            ? 'Justificado'
+                                            : 'Presença pendente'}
+                                    </Badge>
                                   </div>
                                   <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                                     <span className="flex items-center gap-1">
@@ -1247,6 +1871,50 @@ export function PsychologistDashboard({
                               {appointment.notes && (
                                 <div className="rounded-md bg-muted/50 p-3">
                                   <p className="text-sm text-muted-foreground">{appointment.notes}</p>
+                                </div>
+                              )}
+
+                              {appointment.reason && (
+                                <div className="rounded-md border border-border/60 bg-background p-3 text-sm text-muted-foreground">
+                                  <span className="font-medium text-foreground">Motivo:</span>{' '}
+                                  {appointment.reason}
+                                </div>
+                              )}
+
+                              {appointment.groupRequested && appointment.groupRequestNote && !appointment.isGroup && (
+                                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800">
+                                  <span className="font-medium">Solicitação de grupo:</span>{' '}
+                                  {appointment.groupRequestNote}
+                                </div>
+                              )}
+
+                              {appointment.isGroup && (
+                                <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                                  <span className="font-medium text-foreground">Grupo:</span>{' '}
+                                  {appointment.groupName || 'Consulta em grupo'}
+                                  {appointment.groupParticipants.length > 0 && (
+                                    <span>
+                                      {' '}
+                                      • {appointment.groupParticipants.length} participante(s)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {(appointment.tags.length > 0 || appointment.groupTags.length > 0) && (
+                                <div className="flex flex-wrap gap-2">
+                                  {appointment.tags.map((tag) => (
+                                    <Badge key={`tag-${appointment.id}-${tag}`} variant="secondary">
+                                      <Tag className="mr-1 h-3 w-3" />
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {appointment.groupTags.map((tag) => (
+                                    <Badge key={`group-tag-${appointment.id}-${tag}`} variant="outline">
+                                      <Users className="mr-1 h-3 w-3" />
+                                      {tag}
+                                    </Badge>
+                                  ))}
                                 </div>
                               )}
 
@@ -1335,6 +2003,44 @@ export function PsychologistDashboard({
                                           </div>
                                         </div>
 
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                          <div className="space-y-2">
+                                            <Label htmlFor="edit-attendance">Presença</Label>
+                                            <Select
+                                              value={editingAppointment.attendanceStatus}
+                                              onValueChange={(value: AttendanceStatus) =>
+                                                setEditingAppointment({
+                                                  ...editingAppointment,
+                                                  attendanceStatus: value,
+                                                })
+                                              }
+                                            >
+                                              <SelectTrigger id="edit-attendance">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="pending">Pendente</SelectItem>
+                                                <SelectItem value="present">Compareceu</SelectItem>
+                                                <SelectItem value="absent">Faltou</SelectItem>
+                                                <SelectItem value="excused">Justificado</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label htmlFor="edit-duration">Duração</Label>
+                                            <Input
+                                              id="edit-duration"
+                                              value={editingAppointment.duration}
+                                              onChange={(e) =>
+                                                setEditingAppointment({
+                                                  ...editingAppointment,
+                                                  duration: e.target.value,
+                                                })
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+
                                         <div className="space-y-2">
                                           <Label htmlFor="edit-date">Data</Label>
                                           <Popover>
@@ -1363,12 +2069,117 @@ export function PsychologistDashboard({
                                           </Popover>
                                         </div>
 
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+                                          <div className="flex items-center justify-between">
+                                            <div>
+                                              <p className="text-sm font-medium text-foreground">
+                                                Consulta em grupo
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">
+                                                Marque para associar participantes e tags coletivas.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={editingAppointment.isGroup}
+                                              onCheckedChange={(checked) =>
+                                                setEditingAppointment({
+                                                  ...editingAppointment,
+                                                  isGroup: checked,
+                                                  groupRequested: checked
+                                                    ? false
+                                                    : editingAppointment.groupRequested,
+                                                })
+                                              }
+                                            />
+                                          </div>
+                                          {editingAppointment.groupRequested && !editingAppointment.isGroup && (
+                                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
+                                              Solicitação de grupo feita pelo paciente.
+                                            </div>
+                                          )}
+                                          {editingAppointment.isGroup && (
+                                            <div className="grid gap-4 sm:grid-cols-2">
+                                              <div className="space-y-2">
+                                                <Label htmlFor="edit-group-name">Nome do grupo</Label>
+                                                <Input
+                                                  id="edit-group-name"
+                                                  value={editingAppointment.groupName ?? ''}
+                                                  onChange={(e) =>
+                                                    setEditingAppointment({
+                                                      ...editingAppointment,
+                                                      groupName: e.target.value,
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="space-y-2">
+                                                <Label htmlFor="edit-group-size">Tamanho</Label>
+                                                <Input
+                                                  id="edit-group-size"
+                                                  type="number"
+                                                  min={2}
+                                                  value={editingAppointment.groupSize ?? ''}
+                                                  onChange={(e) =>
+                                                    setEditingAppointment({
+                                                      ...editingAppointment,
+                                                      groupSize: Number(e.target.value),
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="space-y-2 sm:col-span-2">
+                                                <Label htmlFor="edit-group-participants">
+                                                  Participantes (emails)
+                                                </Label>
+                                                <Input
+                                                  id="edit-group-participants"
+                                                  value={editingAppointment.groupParticipants.join(', ')}
+                                                  onChange={(e) =>
+                                                    setEditingAppointment({
+                                                      ...editingAppointment,
+                                                      groupParticipants: parseTags(e.target.value),
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="space-y-2 sm:col-span-2">
+                                                <Label htmlFor="edit-group-tags">Tags do grupo</Label>
+                                                <Input
+                                                  id="edit-group-tags"
+                                                  value={editingAppointment.groupTags.join(', ')}
+                                                  onChange={(e) =>
+                                                    setEditingAppointment({
+                                                      ...editingAppointment,
+                                                      groupTags: parseTags(e.target.value),
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+
                                         <div className="space-y-2">
                                           <Label htmlFor="edit-notification">Preferência de Notificação</Label>
                                           <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                                             <Mail className="h-4 w-4" />
                                             Email
                                           </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <Label htmlFor="edit-reason">Motivo da Consulta</Label>
+                                          <Textarea
+                                            id="edit-reason"
+                                            value={editingAppointment.reason}
+                                            onChange={(e) =>
+                                              setEditingAppointment({
+                                                ...editingAppointment,
+                                                reason: e.target.value,
+                                              })
+                                            }
+                                            rows={3}
+                                          />
                                         </div>
 
                                         <div className="space-y-2">
@@ -1383,6 +2194,20 @@ export function PsychologistDashboard({
                                               })
                                             }
                                             rows={4}
+                                          />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <Label htmlFor="edit-tags">Tags privadas</Label>
+                                          <Input
+                                            id="edit-tags"
+                                            value={editingAppointment.tags.join(', ')}
+                                            onChange={(e) =>
+                                              setEditingAppointment({
+                                                ...editingAppointment,
+                                                tags: parseTags(e.target.value),
+                                              })
+                                            }
                                           />
                                         </div>
                                       </div>
@@ -1422,6 +2247,118 @@ export function PsychologistDashboard({
 
           {/* Sidebar */}
           <div className="space-y-6">
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-foreground text-base">Disponibilidade</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Defina seus horários para o paciente agendar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {weekDays.map((day) => (
+                    <div key={day.id} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
+                      <Switch
+                        checked={availability.weekly[day.id]?.enabled}
+                        onCheckedChange={(checked) => handleUpdateAvailability(day.id, 'enabled', checked)}
+                      />
+                      <div className="text-xs text-muted-foreground">{day.label}</div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={availability.weekly[day.id]?.start}
+                          onChange={(e) => handleUpdateAvailability(day.id, 'start', e.target.value)}
+                          className="h-8"
+                        />
+                        <span className="text-xs text-muted-foreground">até</span>
+                        <Input
+                          type="time"
+                          value={availability.weekly[day.id]?.end}
+                          onChange={(e) => handleUpdateAvailability(day.id, 'end', e.target.value)}
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-slot">Duração (min)</Label>
+                    <Input
+                      id="availability-slot"
+                      type="number"
+                      min={20}
+                      value={availability.slotDurationMinutes}
+                      onChange={(e) =>
+                        setAvailability({
+                          ...availability,
+                          slotDurationMinutes: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-buffer">Intervalo (min)</Label>
+                    <Input
+                      id="availability-buffer"
+                      type="number"
+                      min={0}
+                      value={availability.bufferMinutes}
+                      onChange={(e) =>
+                        setAvailability({
+                          ...availability,
+                          bufferMinutes: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Permitir grupos</p>
+                      <p className="text-xs text-muted-foreground">
+                        Habilita agendamento de consultas coletivas.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={availability.allowGroup}
+                      onCheckedChange={(checked) =>
+                        setAvailability({ ...availability, allowGroup: checked })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="availability-max-group">Máximo de participantes</Label>
+                    <Input
+                      id="availability-max-group"
+                      type="number"
+                      min={2}
+                      value={availability.maxGroupSize}
+                      onChange={(e) =>
+                        setAvailability({ ...availability, maxGroupSize: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {availabilityError && (
+                  <p className="text-xs text-destructive">{availabilityError}</p>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={handleSaveAvailability}
+                  disabled={isSavingAvailability || !psychologistId}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  {isSavingAvailability ? 'Salvando...' : 'Salvar disponibilidade'}
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Google Calendar */}
             <Card className="border-border/50">
               <CardHeader>
@@ -1472,6 +2409,8 @@ export function PsychologistDashboard({
                   selected={selectedDate}
                   onSelect={(date) => date && setSelectedDate(date)}
                   className="rounded-md border-0"
+                  modifiers={calendarModifiers}
+                  components={{ DayContent: CalendarDayContent }}
                 />
               </CardContent>
             </Card>
@@ -1501,6 +2440,22 @@ export function PsychologistDashboard({
                             placeholder="Digite o lembrete..."
                             rows={3}
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new-reminder-date">Data</Label>
+                          <Input
+                            id="new-reminder-date"
+                            type="date"
+                            value={newReminderDate ? newReminderDate.toISOString().split('T')[0] : ''}
+                            onChange={(e) =>
+                              setNewReminderDate(
+                                e.target.value ? new Date(`${e.target.value}T12:00:00`) : null,
+                              )
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Essa data aparecerá marcada no calendário.
+                          </p>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="new-reminder-color">Cor</Label>
@@ -1541,9 +2496,16 @@ export function PsychologistDashboard({
                         reminder.color
                       )}`}
                     >
-                      <p className={`text-sm pr-16 ${getReminderTextColor(reminder.color)}`}>
-                        {reminder.text}
-                      </p>
+                      <div className="space-y-1 pr-16">
+                        <p className={`text-sm ${getReminderTextColor(reminder.color)}`}>
+                          {reminder.text}
+                        </p>
+                        {reminder.remindAt && (
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(reminder.remindAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
                       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         <Dialog
                           open={isReminderDialogOpen && editingReminder?.id === reminder.id}
@@ -1583,6 +2545,26 @@ export function PsychologistDashboard({
                                       })
                                     }
                                     rows={3}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit-reminder-date">Data</Label>
+                                  <Input
+                                    id="edit-reminder-date"
+                                    type="date"
+                                    value={
+                                      editingReminder.remindAt
+                                        ? new Date(editingReminder.remindAt).toISOString().split('T')[0]
+                                        : ''
+                                    }
+                                    onChange={(e) =>
+                                      setEditingReminder({
+                                        ...editingReminder,
+                                        remindAt: e.target.value
+                                          ? new Date(`${e.target.value}T12:00:00`)
+                                          : null,
+                                      })
+                                    }
                                   />
                                 </div>
                                 <div className="space-y-2">
@@ -1836,6 +2818,15 @@ export function PsychologistDashboard({
                               />
                             </div>
                             <div className="space-y-2">
+                              <Label htmlFor="record-tags">Tags</Label>
+                              <Input
+                                id="record-tags"
+                                value={newRecordTags}
+                                onChange={(e) => setNewRecordTags(e.target.value)}
+                                placeholder="ansiedade, sono, evolução"
+                              />
+                            </div>
+                            <div className="space-y-2">
                               <Label htmlFor="record-content">Conteúdo</Label>
                               <Textarea
                                 id="record-content"
@@ -1850,6 +2841,7 @@ export function PsychologistDashboard({
                             <Button variant="outline" onClick={() => {
                               setNewRecordTitle('')
                               setNewRecordContent('')
+                              setNewRecordTags('')
                             }}>
                               Cancelar
                             </Button>
@@ -1888,6 +2880,16 @@ export function PsychologistDashboard({
                                   <p className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap">
                                     {record.content}
                                   </p>
+                                  {record.tags.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      {record.tags.map((tag) => (
+                                        <Badge key={`${record.id}-${tag}`} variant="secondary">
+                                          <Tag className="mr-1 h-3 w-3" />
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex gap-1">
                                   <Button
@@ -2072,6 +3074,19 @@ export function PsychologistDashboard({
                     setEditingRecord({
                       ...editingRecord,
                       date: e.target.value ? new Date(e.target.value) : editingRecord.date,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-record-tags">Tags</Label>
+                <Input
+                  id="edit-record-tags"
+                  value={editingRecord.tags.join(', ')}
+                  onChange={(e) =>
+                    setEditingRecord({
+                      ...editingRecord,
+                      tags: parseTags(e.target.value),
                     })
                   }
                 />

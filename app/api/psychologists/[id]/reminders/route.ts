@@ -9,6 +9,15 @@ interface Params {
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
+const normalizeDate = (value?: string) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed
+}
+
 export async function POST(request: Request, { params }: Params) {
   const resolvedParams = await resolveRouteParams(params)
   const id = resolvedParams?.id
@@ -19,6 +28,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const text = normalizeString(payload.text)
   const color = normalizeString(payload.color)
+  const remindAt = normalizeDate(payload.remindAt)
 
   if (!text) {
     return NextResponse.json(
@@ -40,6 +50,7 @@ export async function POST(request: Request, { params }: Params) {
       psychologistId: id,
       text,
       color: color || 'blue',
+      remindAt,
     },
   })
 
@@ -49,6 +60,7 @@ export async function POST(request: Request, { params }: Params) {
         id: reminder.id,
         text: reminder.text,
         color: reminder.color,
+        remindAt: reminder.remindAt?.toISOString() ?? null,
       },
     },
     { status: 201 },

@@ -18,6 +18,8 @@ export async function POST(request: Request, { params }: Params) {
   const payload = await request.json()
 
   const name = normalizeString(payload.name)
+  const email = normalizeString(payload.email)
+  const phone = normalizeString(payload.phone)
   if (!name) {
     return NextResponse.json(
       { error: 'Nome do paciente é obrigatório.' },
@@ -33,17 +35,39 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
-  const patient = await prisma.patient.create({
-    data: {
+  let patient = await prisma.patient.findFirst({
+    where: {
       psychologistId: id,
-      name,
-      email: normalizeString(payload.email) || null,
-      phone: normalizeString(payload.phone) || null,
-      age: normalizeString(payload.age) || null,
-      occupation: normalizeString(payload.occupation) || null,
-      emergencyContact: normalizeString(payload.emergencyContact) || null,
+      ...(email ? { email: { equals: email, mode: 'insensitive' as const } } : {}),
     },
   })
+
+  if (!patient) {
+    patient = await prisma.patient.create({
+      data: {
+        psychologistId: id,
+        name,
+        email: email || null,
+        phone: phone || null,
+        age: normalizeString(payload.age) || null,
+        occupation: normalizeString(payload.occupation) || null,
+        emergencyContact: normalizeString(payload.emergencyContact) || null,
+      },
+    })
+  } else {
+    patient = await prisma.patient.update({
+      where: { id: patient.id },
+      data: {
+        name,
+        email: email || patient.email,
+        phone: phone || patient.phone,
+        age: normalizeString(payload.age) || patient.age,
+        occupation: normalizeString(payload.occupation) || patient.occupation,
+        emergencyContact:
+          normalizeString(payload.emergencyContact) || patient.emergencyContact,
+      },
+    })
+  }
 
   return NextResponse.json(
     {

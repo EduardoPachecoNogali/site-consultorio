@@ -14,6 +14,7 @@ model Psychologist {
   status          String   @default("pending")
   pin             String?
   notes           String?
+  availability    Json?
   inviteToken     String?  @unique
   inviteExpiresAt DateTime?
   inviteAcceptedAt DateTime?
@@ -77,6 +78,7 @@ model MedicalRecord {
   date      DateTime
   title     String
   content   String
+  tags      String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -94,6 +96,16 @@ model Appointment {
   duration               String
   status                 String
   notes                  String?
+  reason                 String?
+  isGroup                Boolean  @default(false)
+  groupName              String?
+  groupSize              Int?
+  groupParticipants      String[] @default([])
+  groupRequested         Boolean  @default(false)
+  groupRequestNote       String?
+  attendanceStatus       String   @default("pending")
+  tags                   String[] @default([])
+  groupTags              String[] @default([])
   notificationPreference String
   patientContact         String
   meetingUrl             String?
@@ -112,6 +124,7 @@ model Reminder {
   psychologistId String
   text           String
   color          String
+  remindAt       DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

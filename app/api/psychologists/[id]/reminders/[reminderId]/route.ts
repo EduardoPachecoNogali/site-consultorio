@@ -9,6 +9,15 @@ interface Params {
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
+const normalizeDate = (value?: string) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed
+}
+
 export async function PATCH(request: Request, { params }: Params) {
   const resolvedParams = await resolveRouteParams(params)
   const id = resolvedParams?.id
@@ -32,7 +41,7 @@ export async function PATCH(request: Request, { params }: Params) {
     )
   }
 
-  const updateData: { text?: string; color?: string } = {}
+  const updateData: { text?: string; color?: string; remindAt?: Date | null } = {}
 
   if (payload.text !== undefined) {
     const value = normalizeString(payload.text)
@@ -41,6 +50,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (payload.color !== undefined) {
     const value = normalizeString(payload.color)
     if (value) updateData.color = value
+  }
+  if (payload.remindAt !== undefined) {
+    updateData.remindAt = normalizeDate(payload.remindAt)
   }
 
   const updated = await prisma.reminder.update({
@@ -53,6 +65,7 @@ export async function PATCH(request: Request, { params }: Params) {
       id: updated.id,
       text: updated.text,
       color: updated.color,
+      remindAt: updated.remindAt?.toISOString() ?? null,
     },
   })
 }
