@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Calendar } from '@/components/ui/calendar'
+import type { DayButtonProps } from 'react-day-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -125,7 +126,7 @@ const hydrateDashboard = (payload: DashboardPayload) => ({
   })),
   appointments: payload.appointments.map((appointment) => ({
     ...appointment,
-    notificationPreference: 'email',
+    notificationPreference: 'email' as const,
     meetingUrl: appointment.meetingUrl || '',
     reason: appointment.reason || '',
     isGroup: appointment.isGroup ?? false,
@@ -1152,25 +1153,21 @@ export function PsychologistDashboard({
     return viewingPatient
   }, [patientProfiles, reportPatientId, viewingPatient])
 
-  const CalendarDayContent = ({
-    date,
-    activeModifiers,
-  }: {
-    date: Date
-    activeModifiers: { [key: string]: boolean }
-  }) => {
-    const day = date.getDate()
-    const hasAppointment = activeModifiers.hasAppointment
-    const hasReminder = activeModifiers.hasReminder
+  const CalendarDayContent = ({ day, modifiers, className, ...props }: DayButtonProps) => {
+    const dayNumber = day.date.getDate()
+    const hasAppointment = Boolean(modifiers.hasAppointment)
+    const hasReminder = Boolean(modifiers.hasReminder)
 
     return (
-      <div className="flex flex-col items-center">
-        <span>{day}</span>
-        <span className="mt-1 flex items-center gap-1">
-          {hasAppointment && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-          {hasReminder && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-        </span>
-      </div>
+      <button {...props} className={className}>
+        <div className="flex flex-col items-center">
+          <span>{dayNumber}</span>
+          <span className="mt-1 flex items-center gap-1">
+            {hasAppointment && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+            {hasReminder && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+          </span>
+        </div>
+      </button>
     )
   }
 
@@ -1293,593 +1290,599 @@ export function PsychologistDashboard({
               </Card>
             </div>
 
-            {/* Actions + Calendar + Search */}
-            <Card className="border-border/50">
-              <CardHeader>
-                <div className="flex flex-col gap-3">
-                  <CardTitle className="text-foreground">Ações Rápidas</CardTitle>
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          const newDate = new Date(selectedDate)
-                          newDate.setDate(newDate.getDate() - 1)
-                          setSelectedDate(newDate)
-                        }}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="gap-2 bg-transparent">
-                            <CalendarIcon className="h-4 w-4" />
-                            {selectedDate.toLocaleDateString('pt-BR', {
-                              weekday: 'long',
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric',
-                            })}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={(date) => date && setSelectedDate(date)}
-                            modifiers={calendarModifiers}
-                            components={{ DayContent: CalendarDayContent }}
-                          />
-                        </PopoverContent>
-                      </Popover>
+            {/* Agenda + Ações rápidas */}
+            <Tabs defaultValue="agenda" className="flex flex-col">
+              <Card className="border-border/50">
+                <CardHeader>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            const newDate = new Date(selectedDate)
+                            newDate.setDate(newDate.getDate() - 1)
+                            setSelectedDate(newDate)
+                          }}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
 
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          const newDate = new Date(selectedDate)
-                          newDate.setDate(newDate.getDate() + 1)
-                          setSelectedDate(newDate)
-                        }}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="gap-2 bg-transparent">
+                              <CalendarIcon className="h-4 w-4" />
+                              {selectedDate.toLocaleDateString('pt-BR', {
+                                weekday: 'long',
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => date && setSelectedDate(date)}
+                              modifiers={calendarModifiers}
+                            components={{ DayButton: CalendarDayContent }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            const newDate = new Date(selectedDate)
+                            newDate.setDate(newDate.getDate() + 1)
+                            setSelectedDate(newDate)
+                          }}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+                        <TabsTrigger value="agenda">Agenda</TabsTrigger>
+                        <TabsTrigger value="availability">Disponibilidade</TabsTrigger>
+                      </TabsList>
                     </div>
 
-                    <div className="relative w-full lg:w-64">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar paciente..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  <Dialog
-                    open={isNewAppointmentOpen}
-                    onOpenChange={(open) => {
-                      setIsNewAppointmentOpen(open)
-                      if (!open) {
-                        resetNewAppointmentForm()
-                      }
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button variant="default" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Nova Consulta
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Agendar Nova Consulta</DialogTitle>
-                        <DialogDescription>
-                          Preencha os dados para criar uma nova consulta
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="new-patient-name">Nome do Paciente</Label>
+                    <TabsContent value="agenda" className="mt-0">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="relative w-full lg:w-64">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
-                            id="new-patient-name"
-                            value={newAppointment.patientName}
-                            onChange={(e) =>
-                              setNewAppointment({ ...newAppointment, patientName: e.target.value })
-                            }
-                            placeholder="Nome completo"
+                            placeholder="Buscar paciente..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9"
                           />
-                          {patientSuggestions.length > 0 && (
-                            <div className="rounded-md border border-border/50 bg-muted/30">
-                              <p className="px-3 py-2 text-xs text-muted-foreground">
-                                Clique para preencher os dados automaticamente
-                              </p>
-                              <div className="divide-y divide-border/50">
-                                {patientSuggestions.slice(0, 5).map((patient) => (
-                                  <button
-                                    key={patient.id}
-                                    type="button"
-                                    onClick={() => handleSelectExistingPatient(patient)}
-                                    className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-card"
-                                  >
-                                    <div>
-                                      <p className="text-sm font-medium text-foreground">
-                                        {patient.name}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">{patient.email}</p>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                      {patient.phone}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="new-patient-email">Email</Label>
-                            <Input
-                              id="new-patient-email"
-                              type="email"
-                              value={newAppointment.patientEmail}
-                              onChange={(e) =>
-                                setNewAppointment({ ...newAppointment, patientEmail: e.target.value })
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Ações rápidas</span>
+                          <Dialog
+                            open={isNewAppointmentOpen}
+                            onOpenChange={(open) => {
+                              setIsNewAppointmentOpen(open)
+                              if (!open) {
+                                resetNewAppointmentForm()
                               }
-                              placeholder="email@exemplo.com"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="new-patient-phone">Telefone</Label>
-                            <Input
-                              id="new-patient-phone"
-                              value={newAppointment.patientPhone}
-                              onChange={(e) =>
-                                setNewAppointment({ ...newAppointment, patientPhone: e.target.value })
-                              }
-                              placeholder="+55 11 99999-9999"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-foreground">Consulta em grupo</p>
-                              <p className="text-xs text-muted-foreground">
-                                Ative para adicionar participantes e tags coletivas.
-                              </p>
-                            </div>
-                            <Switch
-                              checked={newAppointment.isGroup}
-                              onCheckedChange={(checked) =>
-                                setNewAppointment({ ...newAppointment, isGroup: checked })
-                              }
-                            />
-                          </div>
-                          {newAppointment.isGroup && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <div className="space-y-2">
-                                <Label htmlFor="new-group-name">Nome do grupo</Label>
-                                <Input
-                                  id="new-group-name"
-                                  value={newAppointment.groupName}
-                                  onChange={(e) =>
-                                    setNewAppointment({ ...newAppointment, groupName: e.target.value })
-                                  }
-                                  placeholder="Ex: Grupo ansiedade"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="new-group-size">Tamanho do grupo</Label>
-                                <Input
-                                  id="new-group-size"
-                                  type="number"
-                                  min={2}
-                                  value={newAppointment.groupSize}
-                                  onChange={(e) =>
-                                    setNewAppointment({
-                                      ...newAppointment,
-                                      groupSize: Number(e.target.value),
-                                    })
-                                  }
-                                />
-                              </div>
-                              <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="new-group-participants">Participantes (emails)</Label>
-                                <Input
-                                  id="new-group-participants"
-                                  value={newAppointment.groupParticipants.join(', ')}
-                                  onChange={(e) =>
-                                    setNewAppointment({
-                                      ...newAppointment,
-                                      groupParticipants: parseTags(e.target.value),
-                                    })
-                                  }
-                                  placeholder="email1@exemplo.com, email2@exemplo.com"
-                                />
-                              </div>
-                              <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="new-group-tags">Tags do grupo</Label>
-                                <Input
-                                  id="new-group-tags"
-                                  value={newAppointment.groupTags.join(', ')}
-                                  onChange={(e) =>
-                                    setNewAppointment({
-                                      ...newAppointment,
-                                      groupTags: parseTags(e.target.value),
-                                    })
-                                  }
-                                  placeholder="ansiedade, suporte, terapia em grupo"
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="new-time">Horário</Label>
-                            <Input
-                              id="new-time"
-                              type="time"
-                              value={newAppointment.time}
-                              onChange={(e) =>
-                                setNewAppointment({ ...newAppointment, time: e.target.value })
-                              }
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="new-duration">Duração</Label>
-                            <Select
-                              value={newAppointment.duration}
-                              onValueChange={(value) =>
-                                setNewAppointment({ ...newAppointment, duration: value })
-                              }
-                            >
-                              <SelectTrigger id="new-duration">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="30 min">30 minutos</SelectItem>
-                                <SelectItem value="50 min">50 minutos</SelectItem>
-                                <SelectItem value="60 min">60 minutos</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="new-date">Data</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
-                                <CalendarIcon className="h-4 w-4" />
-                                {newAppointment.date.toLocaleDateString('pt-BR')}
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button variant="default" className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                Nova Consulta
                               </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={newAppointment.date}
-                                onSelect={(date) =>
-                                  date && setNewAppointment({ ...newAppointment, date })
-                                }
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-3">
-                          {additionalSlots.map((slot, index) => (
-                            <div
-                              key={slot.id}
-                              className="rounded-md border border-dashed border-border/60 p-4 space-y-3"
-                            >
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium text-foreground">
-                                  Data extra #{index + 1}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveTimeSlot(slot.id)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <div className="grid gap-4 sm:grid-cols-2">
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>Agendar Nova Consulta</DialogTitle>
+                                <DialogDescription>
+                                  Preencha os dados para criar uma nova consulta
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
                                 <div className="space-y-2">
-                                  <Label>Data</Label>
+                                  <Label htmlFor="new-patient-name">Nome do Paciente</Label>
+                                  <Input
+                                    id="new-patient-name"
+                                    value={newAppointment.patientName}
+                                    onChange={(e) =>
+                                      setNewAppointment({ ...newAppointment, patientName: e.target.value })
+                                    }
+                                    placeholder="Nome completo"
+                                  />
+                                  {patientSuggestions.length > 0 && (
+                                    <div className="rounded-md border border-border/50 bg-muted/30">
+                                      <p className="px-3 py-2 text-xs text-muted-foreground">
+                                        Clique para preencher os dados automaticamente
+                                      </p>
+                                      <div className="divide-y divide-border/50">
+                                        {patientSuggestions.slice(0, 5).map((patient) => (
+                                          <button
+                                            key={patient.id}
+                                            type="button"
+                                            onClick={() => handleSelectExistingPatient(patient)}
+                                            className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left hover:bg-card"
+                                          >
+                                            <div>
+                                              <p className="text-sm font-medium text-foreground">
+                                                {patient.name}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground">{patient.email}</p>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                              {patient.phone}
+                                            </span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="new-patient-email">Email</Label>
+                                    <Input
+                                      id="new-patient-email"
+                                      type="email"
+                                      value={newAppointment.patientEmail}
+                                      onChange={(e) =>
+                                        setNewAppointment({ ...newAppointment, patientEmail: e.target.value })
+                                      }
+                                      placeholder="email@exemplo.com"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label htmlFor="new-patient-phone">Telefone</Label>
+                                    <Input
+                                      id="new-patient-phone"
+                                      value={newAppointment.patientPhone}
+                                      onChange={(e) =>
+                                        setNewAppointment({ ...newAppointment, patientPhone: e.target.value })
+                                      }
+                                      placeholder="+55 11 99999-9999"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">Consulta em grupo</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Ative para adicionar participantes e tags coletivas.
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={newAppointment.isGroup}
+                                      onCheckedChange={(checked) =>
+                                        setNewAppointment({ ...newAppointment, isGroup: checked })
+                                      }
+                                    />
+                                  </div>
+                                  {newAppointment.isGroup && (
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                      <div className="space-y-2">
+                                        <Label htmlFor="new-group-name">Nome do grupo</Label>
+                                        <Input
+                                          id="new-group-name"
+                                          value={newAppointment.groupName}
+                                          onChange={(e) =>
+                                            setNewAppointment({ ...newAppointment, groupName: e.target.value })
+                                          }
+                                          placeholder="Ex: Grupo ansiedade"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label htmlFor="new-group-size">Tamanho do grupo</Label>
+                                        <Input
+                                          id="new-group-size"
+                                          type="number"
+                                          min={2}
+                                          value={newAppointment.groupSize}
+                                          onChange={(e) =>
+                                            setNewAppointment({
+                                              ...newAppointment,
+                                              groupSize: Number(e.target.value),
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-2 sm:col-span-2">
+                                        <Label htmlFor="new-group-participants">Participantes (emails)</Label>
+                                        <Input
+                                          id="new-group-participants"
+                                          value={newAppointment.groupParticipants.join(', ')}
+                                          onChange={(e) =>
+                                            setNewAppointment({
+                                              ...newAppointment,
+                                              groupParticipants: parseTags(e.target.value),
+                                            })
+                                          }
+                                          placeholder="email1@exemplo.com, email2@exemplo.com"
+                                        />
+                                      </div>
+                                      <div className="space-y-2 sm:col-span-2">
+                                        <Label htmlFor="new-group-tags">Tags do grupo</Label>
+                                        <Input
+                                          id="new-group-tags"
+                                          value={newAppointment.groupTags.join(', ')}
+                                          onChange={(e) =>
+                                            setNewAppointment({
+                                              ...newAppointment,
+                                              groupTags: parseTags(e.target.value),
+                                            })
+                                          }
+                                          placeholder="ansiedade, suporte, terapia em grupo"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="new-time">Horário</Label>
+                                    <Input
+                                      id="new-time"
+                                      type="time"
+                                      value={newAppointment.time}
+                                      onChange={(e) =>
+                                        setNewAppointment({ ...newAppointment, time: e.target.value })
+                                      }
+                                    />
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label htmlFor="new-duration">Duração</Label>
+                                    <Select
+                                      value={newAppointment.duration}
+                                      onValueChange={(value) =>
+                                        setNewAppointment({ ...newAppointment, duration: value })
+                                      }
+                                    >
+                                      <SelectTrigger id="new-duration">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="30 min">30 minutos</SelectItem>
+                                        <SelectItem value="50 min">50 minutos</SelectItem>
+                                        <SelectItem value="60 min">60 minutos</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="new-date">Data</Label>
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        className="w-full justify-start gap-2 bg-transparent"
-                                      >
+                                      <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
                                         <CalendarIcon className="h-4 w-4" />
-                                        {slot.date.toLocaleDateString('pt-BR')}
+                                        {newAppointment.date.toLocaleDateString('pt-BR')}
                                       </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0">
                                       <Calendar
                                         mode="single"
-                                        selected={slot.date}
+                                        selected={newAppointment.date}
                                         onSelect={(date) =>
-                                          date && handleUpdateTimeSlot(slot.id, { date })
+                                          date && setNewAppointment({ ...newAppointment, date })
                                         }
                                       />
                                     </PopoverContent>
                                   </Popover>
                                 </div>
+
+                                <div className="space-y-3">
+                                  {additionalSlots.map((slot, index) => (
+                                    <div
+                                      key={slot.id}
+                                      className="rounded-md border border-dashed border-border/60 p-4 space-y-3"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-sm font-medium text-foreground">
+                                          Data extra #{index + 1}
+                                        </p>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleRemoveTimeSlot(slot.id)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                      <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                          <Label>Data</Label>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Button
+                                                variant="outline"
+                                                className="w-full justify-start gap-2 bg-transparent"
+                                              >
+                                                <CalendarIcon className="h-4 w-4" />
+                                                {slot.date.toLocaleDateString('pt-BR')}
+                                              </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                              <Calendar
+                                                mode="single"
+                                                selected={slot.date}
+                                                onSelect={(date) =>
+                                                  date && handleUpdateTimeSlot(slot.id, { date })
+                                                }
+                                              />
+                                            </PopoverContent>
+                                          </Popover>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label>Horário</Label>
+                                          <Input
+                                            type="time"
+                                            value={slot.time}
+                                            onChange={(e) =>
+                                              handleUpdateTimeSlot(slot.id, { time: e.target.value })
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full border-dashed border-border/70"
+                                    onClick={handleAddTimeSlot}
+                                  >
+                                    + Adicionar outra data/horário
+                                  </Button>
+                                </div>
+
                                 <div className="space-y-2">
-                                  <Label>Horário</Label>
-                                  <Input
-                                    type="time"
-                                    value={slot.time}
+                                  <Label htmlFor="new-notification">Preferência de Notificação</Label>
+                                  <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                                    <Mail className="h-4 w-4" />
+                                    Email
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="new-reason">Motivo da Consulta</Label>
+                                  <Textarea
+                                    id="new-reason"
+                                    value={newAppointment.reason}
                                     onChange={(e) =>
-                                      handleUpdateTimeSlot(slot.id, { time: e.target.value })
+                                      setNewAppointment({ ...newAppointment, reason: e.target.value })
                                     }
+                                    placeholder="Descreva o motivo principal da consulta..."
+                                    rows={3}
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="new-notes">Notas</Label>
+                                  <Textarea
+                                    id="new-notes"
+                                    value={newAppointment.notes}
+                                    onChange={(e) =>
+                                      setNewAppointment({ ...newAppointment, notes: e.target.value })
+                                    }
+                                    placeholder="Observações sobre a consulta..."
+                                    rows={3}
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="new-tags">Tags privadas</Label>
+                                  <Input
+                                    id="new-tags"
+                                    value={newAppointment.tags.join(', ')}
+                                    onChange={(e) =>
+                                      setNewAppointment({ ...newAppointment, tags: parseTags(e.target.value) })
+                                    }
+                                    placeholder="ansiedade, acompanhamento, retorno"
                                   />
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full border-dashed border-border/70"
-                            onClick={handleAddTimeSlot}
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    resetNewAppointmentForm()
+                                    setIsNewAppointmentOpen(false)
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button type="button" onClick={handleAddAppointment}>
+                                  Agendar
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
+                          <Dialog
+                            open={isReportDialogOpen}
+                            onOpenChange={(open) => {
+                              setIsReportDialogOpen(open)
+                              if (open && viewingPatient && !reportPatientId) {
+                                setReportPatientId(viewingPatient.id)
+                              }
+                            }}
                           >
-                            + Adicionar outra data/horário
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="new-notification">Preferência de Notificação</Label>
-                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                            <Mail className="h-4 w-4" />
-                            Email
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="new-reason">Motivo da Consulta</Label>
-                          <Textarea
-                            id="new-reason"
-                            value={newAppointment.reason}
-                            onChange={(e) =>
-                              setNewAppointment({ ...newAppointment, reason: e.target.value })
-                            }
-                            placeholder="Descreva o motivo principal da consulta..."
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="new-notes">Notas</Label>
-                          <Textarea
-                            id="new-notes"
-                            value={newAppointment.notes}
-                            onChange={(e) =>
-                              setNewAppointment({ ...newAppointment, notes: e.target.value })
-                            }
-                            placeholder="Observações sobre a consulta..."
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="new-tags">Tags privadas</Label>
-                          <Input
-                            id="new-tags"
-                            value={newAppointment.tags.join(', ')}
-                            onChange={(e) =>
-                              setNewAppointment({ ...newAppointment, tags: parseTags(e.target.value) })
-                            }
-                            placeholder="ansiedade, acompanhamento, retorno"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            resetNewAppointmentForm()
-                            setIsNewAppointmentOpen(false)
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button type="button" onClick={handleAddAppointment}>
-                          Agendar
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog
-                    open={isReportDialogOpen}
-                    onOpenChange={(open) => {
-                      setIsReportDialogOpen(open)
-                      if (open && viewingPatient && !reportPatientId) {
-                        setReportPatientId(viewingPatient.id)
-                      }
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="gap-2 bg-transparent">
-                        <FileText className="h-4 w-4" />
-                        Relatórios
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle>Relatório mensal</DialogTitle>
-                        <DialogDescription>
-                          Gere um PDF com o resumo do mês e progressão das sessões.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="report-patient">Paciente</Label>
-                          <Select
-                            value={reportPatientId}
-                            onValueChange={(value) => setReportPatientId(value)}
-                          >
-                            <SelectTrigger id="report-patient">
-                              <SelectValue placeholder="Selecione um paciente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {patientProfiles.map((patient) => (
-                                <SelectItem key={patient.id} value={patient.id}>
-                                  {patient.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="report-month">Mês</Label>
-                          <Input
-                            id="report-month"
-                            type="month"
-                            value={reportMonth}
-                            onChange={(e) => setReportMonth(e.target.value)}
-                          />
-                        </div>
-                        <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
-                          O relatório inclui sessões, presença, prontuários e anotações do mês selecionado.
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsReportDialogOpen(false)}>
-                          Cancelar
-                        </Button>
-                        <Button onClick={handleGenerateMonthlyReport} className="gap-2">
-                          <Download className="h-4 w-4" />
-                          Gerar PDF
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Appointments List */}
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-foreground">Agenda do Dia</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  {filteredAppointments.length} consulta(s) para hoje
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[600px] pr-4">
-                  {filteredAppointments.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <CalendarIcon className="h-12 w-12 text-muted-foreground/50" />
-                      <p className="mt-4 text-sm text-muted-foreground">
-                        Nenhuma consulta encontrada para esta data
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredAppointments.map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className="group relative rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-3">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <h3 className="font-semibold text-foreground">
-                                      {appointment.patientName}
-                                    </h3>
-                                    <Badge
-                                      variant="outline"
-                                      className={getStatusColor(appointment.status)}
-                                    >
-                                      {getStatusLabel(appointment.status)}
-                                    </Badge>
-                                    {appointment.isGroup && (
-                                      <Badge variant="outline" className="border-blue-500/30 text-blue-700">
-                                        <Users className="mr-1 h-3 w-3" />
-                                        Grupo
-                                      </Badge>
-                                    )}
-                                    {appointment.groupRequested && !appointment.isGroup && (
-                                      <Badge variant="outline" className="border-amber-500/30 text-amber-700">
-                                        Solicitação de grupo
-                                      </Badge>
-                                    )}
-                                    <Badge variant="outline" className="border-border/50 text-muted-foreground">
-                                      {appointment.attendanceStatus === 'present'
-                                        ? 'Compareceu'
-                                        : appointment.attendanceStatus === 'absent'
-                                          ? 'Faltou'
-                                          : appointment.attendanceStatus === 'excused'
-                                            ? 'Justificado'
-                                            : 'Presença pendente'}
-                                    </Badge>
-                                  </div>
-                                  <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="h-3.5 w-3.5" />
-                                      {appointment.time}
-                                    </span>
-                                    <span>•</span>
-                                    <span>{appointment.duration}</span>
-                                    <span>•</span>
-                                    <span className="flex items-center gap-1">
-                                      <Mail className="h-3.5 w-3.5" />
-                                      Email
-                                    </span>
-                                  </div>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" className="gap-2 bg-transparent">
+                                <FileText className="h-4 w-4" />
+                                Relatórios
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader>
+                                <DialogTitle>Relatório mensal</DialogTitle>
+                                <DialogDescription>
+                                  Gere um PDF com o resumo do mês e progressão das sessões.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="report-patient">Paciente</Label>
+                                  <Select
+                                    value={reportPatientId}
+                                    onValueChange={(value) => setReportPatientId(value)}
+                                  >
+                                    <SelectTrigger id="report-patient">
+                                      <SelectValue placeholder="Selecione um paciente" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {patientProfiles.map((patient) => (
+                                        <SelectItem key={patient.id} value={patient.id}>
+                                          {patient.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-
-                                <div className="flex items-center gap-1">
-                                  {appointment.status === 'upcoming' && (
-                                    <Button
-                                      variant="default"
-                                      size="sm"
-                                      className="gap-2"
-                                      onClick={() => handleStartCall(appointment)}
-                                    >
-                                      <Video className="h-4 w-4" />
-                                      Iniciar Chamada
-                                    </Button>
-                                  )}
+                                <div className="space-y-2">
+                                  <Label htmlFor="report-month">Mês</Label>
+                                  <Input
+                                    id="report-month"
+                                    type="month"
+                                    value={reportMonth}
+                                    onChange={(e) => setReportMonth(e.target.value)}
+                                  />
+                                </div>
+                                <div className="rounded-md border border-dashed border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+                                  O relatório inclui sessões, presença, prontuários e anotações do mês selecionado.
                                 </div>
                               </div>
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setIsReportDialogOpen(false)}>
+                                  Cancelar
+                                </Button>
+                                <Button onClick={handleGenerateMonthlyReport} className="gap-2">
+                                  <Download className="h-4 w-4" />
+                                  Gerar PDF
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <TabsContent value="agenda" className="mt-0">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold text-foreground">Agenda do Dia</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {filteredAppointments.length} consulta(s) para hoje
+                      </p>
+                    </div>
+                    <ScrollArea className="h-[600px] pr-4">
+                      {filteredAppointments.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <CalendarIcon className="h-12 w-12 text-muted-foreground/50" />
+                          <p className="mt-4 text-sm text-muted-foreground">
+                            Nenhuma consulta encontrada para esta data
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {filteredAppointments.map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              className="group relative rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold text-foreground">
+                                          {appointment.patientName}
+                                        </h3>
+                                        <Badge
+                                          variant="outline"
+                                          className={getStatusColor(appointment.status)}
+                                        >
+                                          {getStatusLabel(appointment.status)}
+                                        </Badge>
+                                        {appointment.isGroup && (
+                                          <Badge variant="outline" className="border-blue-500/30 text-blue-700">
+                                            <Users className="mr-1 h-3 w-3" />
+                                            Grupo
+                                          </Badge>
+                                        )}
+                                        {appointment.groupRequested && !appointment.isGroup && (
+                                          <Badge variant="outline" className="border-amber-500/30 text-amber-700">
+                                            Solicitação de grupo
+                                          </Badge>
+                                        )}
+                                        <Badge variant="outline" className="border-border/50 text-muted-foreground">
+                                          {appointment.attendanceStatus === 'present'
+                                            ? 'Compareceu'
+                                            : appointment.attendanceStatus === 'absent'
+                                              ? 'Faltou'
+                                              : appointment.attendanceStatus === 'excused'
+                                                ? 'Justificado'
+                                                : 'Presença pendente'}
+                                        </Badge>
+                                      </div>
+                                      <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="h-3.5 w-3.5" />
+                                          {appointment.time}
+                                        </span>
+                                        <span>•</span>
+                                        <span>{appointment.duration}</span>
+                                        <span>•</span>
+                                        <span className="flex items-center gap-1">
+                                          <Mail className="h-3.5 w-3.5" />
+                                          Email
+                                        </span>
+                                      </div>
+                                    </div>
 
-                              {appointment.notes && (
-                                <div className="rounded-md bg-muted/50 p-3">
-                                  <p className="text-sm text-muted-foreground">{appointment.notes}</p>
-                                </div>
-                              )}
+                                    <div className="flex items-center gap-1">
+                                      {appointment.status === 'upcoming' && (
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          className="gap-2"
+                                          onClick={() => handleStartCall(appointment)}
+                                        >
+                                          <Video className="h-4 w-4" />
+                                          Iniciar Chamada
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
 
-                              {appointment.reason && (
-                                <div className="rounded-md border border-border/60 bg-background p-3 text-sm text-muted-foreground">
-                                  <span className="font-medium text-foreground">Motivo:</span>{' '}
-                                  {appointment.reason}
-                                </div>
-                              )}
+                                  {appointment.notes && (
+                                    <div className="rounded-md bg-muted/50 p-3">
+                                      <p className="text-sm text-muted-foreground">{appointment.notes}</p>
+                                    </div>
+                                  )}
+
+                                  {appointment.reason && (
+                                    <div className="rounded-md border border-border/60 bg-background p-3 text-sm text-muted-foreground">
+                                      <span className="font-medium text-foreground">Motivo:</span>{' '}
+                                      {appointment.reason}
+                                    </div>
+                                  )}
 
                               {appointment.groupRequested && appointment.groupRequestNote && !appointment.isGroup && (
                                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800">
@@ -2240,144 +2243,206 @@ export function PsychologistDashboard({
                       ))}
                     </div>
                   )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                    </ScrollArea>
+                  </TabsContent>
+                  <TabsContent value="availability" className="mt-0 space-y-4">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold text-foreground">Disponibilidade</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Defina seus horários para o paciente agendar.
+                      </p>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        {weekDays.map((day) => (
+                          <div key={day.id} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
+                            <Switch
+                              checked={availability.weekly[day.id]?.enabled}
+                              onCheckedChange={(checked) => handleUpdateAvailability(day.id, 'enabled', checked)}
+                            />
+                            <div className="text-xs text-muted-foreground">{day.label}</div>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="time"
+                                value={availability.weekly[day.id]?.start}
+                                onChange={(e) => handleUpdateAvailability(day.id, 'start', e.target.value)}
+                                className="h-8"
+                              />
+                              <span className="text-xs text-muted-foreground">até</span>
+                              <Input
+                                type="time"
+                                value={availability.weekly[day.id]?.end}
+                                onChange={(e) => handleUpdateAvailability(day.id, 'end', e.target.value)}
+                                className="h-8"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="availability-slot">Duração (min)</Label>
+                          <Input
+                            id="availability-slot"
+                            type="number"
+                            min={20}
+                            value={availability.slotDurationMinutes}
+                            onChange={(e) =>
+                              setAvailability({
+                                ...availability,
+                                slotDurationMinutes: Number(e.target.value),
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="availability-buffer">Intervalo (min)</Label>
+                          <Input
+                            id="availability-buffer"
+                            type="number"
+                            min={0}
+                            value={availability.bufferMinutes}
+                            onChange={(e) =>
+                              setAvailability({
+                                ...availability,
+                                bufferMinutes: Number(e.target.value),
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Permitir grupos</p>
+                            <p className="text-xs text-muted-foreground">
+                              Habilita agendamento de consultas coletivas.
+                            </p>
+                          </div>
+                          <Switch
+                            checked={availability.allowGroup}
+                            onCheckedChange={(checked) =>
+                              setAvailability({ ...availability, allowGroup: checked })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="availability-max-group">Máximo de participantes</Label>
+                          <Input
+                            id="availability-max-group"
+                            type="number"
+                            min={2}
+                            value={availability.maxGroupSize}
+                            onChange={(e) =>
+                              setAvailability({ ...availability, maxGroupSize: Number(e.target.value) })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {availabilityError && (
+                        <p className="text-xs text-destructive">{availabilityError}</p>
+                      )}
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={handleSaveAvailability}
+                        disabled={isSavingAvailability || !psychologistId}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        {isSavingAvailability ? 'Salvando...' : 'Salvar disponibilidade'}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </CardContent>
+              </Card>
+            </Tabs>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="text-foreground text-base">Disponibilidade</CardTitle>
+                <CardTitle className="text-foreground text-base">Calendário</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Defina seus horários para o paciente agendar.
+                  Consultas e lembretes com integração Google.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {weekDays.map((day) => (
-                    <div key={day.id} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
-                      <Switch
-                        checked={availability.weekly[day.id]?.enabled}
-                        onCheckedChange={(checked) => handleUpdateAvailability(day.id, 'enabled', checked)}
-                      />
-                      <div className="text-xs text-muted-foreground">{day.label}</div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={availability.weekly[day.id]?.start}
-                          onChange={(e) => handleUpdateAvailability(day.id, 'start', e.target.value)}
-                          className="h-8"
-                        />
-                        <span className="text-xs text-muted-foreground">até</span>
-                        <Input
-                          type="time"
-                          value={availability.weekly[day.id]?.end}
-                          onChange={(e) => handleUpdateAvailability(day.id, 'end', e.target.value)}
-                          className="h-8"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="availability-slot">Duração (min)</Label>
-                    <Input
-                      id="availability-slot"
-                      type="number"
-                      min={20}
-                      value={availability.slotDurationMinutes}
-                      onChange={(e) =>
-                        setAvailability({
-                          ...availability,
-                          slotDurationMinutes: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability-buffer">Intervalo (min)</Label>
-                    <Input
-                      id="availability-buffer"
-                      type="number"
-                      min={0}
-                      value={availability.bufferMinutes}
-                      onChange={(e) =>
-                        setAvailability({
-                          ...availability,
-                          bufferMinutes: Number(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  className="rounded-md border-0"
+                  modifiers={calendarModifiers}
+                  components={{ DayButton: CalendarDayContent }}
+                />
+                <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Permitir grupos</p>
+                      <p className="text-sm font-medium text-foreground">
+                        Consultas em {selectedDate.toLocaleDateString('pt-BR')}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        Habilita agendamento de consultas coletivas.
+                        {todayAppointments.length} consulta(s) no dia
                       </p>
                     </div>
-                    <Switch
-                      checked={availability.allowGroup}
-                      onCheckedChange={(checked) =>
-                        setAvailability({ ...availability, allowGroup: checked })
-                      }
-                    />
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-primary" />
+                        Consultas
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-amber-500" />
+                        Lembretes
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability-max-group">Máximo de participantes</Label>
-                    <Input
-                      id="availability-max-group"
-                      type="number"
-                      min={2}
-                      value={availability.maxGroupSize}
-                      onChange={(e) =>
-                        setAvailability({ ...availability, maxGroupSize: Number(e.target.value) })
-                      }
-                    />
-                  </div>
+                  {todayAppointments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Sem consultas registradas para esta data.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {todayAppointments.slice(0, 3).map((appointment) => (
+                        <div
+                          key={appointment.id}
+                          className="flex items-center justify-between gap-2 rounded-md bg-background/80 px-2 py-1.5 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{appointment.time}</span>
+                            <span className="text-muted-foreground">{appointment.patientName}</span>
+                          </div>
+                          <Badge variant="outline" className={getStatusColor(appointment.status)}>
+                            {getStatusLabel(appointment.status)}
+                          </Badge>
+                        </div>
+                      ))}
+                      {todayAppointments.length > 3 && (
+                        <p className="text-xs text-muted-foreground">
+                          + {todayAppointments.length - 3} consulta(s) no dia
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                {availabilityError && (
-                  <p className="text-xs text-destructive">{availabilityError}</p>
-                )}
-                <Button
-                  variant="outline"
-                  className="w-full gap-2"
-                  onClick={handleSaveAvailability}
-                  disabled={isSavingAvailability || !psychologistId}
-                >
-                  <CalendarClock className="h-4 w-4" />
-                  {isSavingAvailability ? 'Salvando...' : 'Salvar disponibilidade'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Google Calendar */}
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-foreground text-base">Google Calendar</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Gere links do Meet automaticamente nas consultas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                <Separator />
                 <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Google Calendar</p>
+                    <p className="text-xs text-muted-foreground">
+                      Gere links do Meet automaticamente nas consultas.
+                    </p>
+                  </div>
                   {googleStatus?.connected ? (
                     <div className="text-sm text-emerald-600">
                       Conectado{googleStatus.email ? `: ${googleStatus.email}` : ''}
                       {googleConnectedAtLabel ? ` em ${googleConnectedAtLabel}` : ''}
                     </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Ainda não conectado.
-                    </div>
+                    <div className="text-sm text-muted-foreground">Ainda não conectado.</div>
                   )}
                   {googleConnectError && (
                     <p className="text-xs text-destructive">{googleConnectError}</p>
@@ -2395,23 +2460,6 @@ export function PsychologistDashboard({
                         : 'Conectar Google Calendar'}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Calendar Widget */}
-            <Card className="border-border/50">
-              <CardHeader>
-                <CardTitle className="text-foreground text-base">Calendário</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
-                  className="rounded-md border-0"
-                  modifiers={calendarModifiers}
-                  components={{ DayContent: CalendarDayContent }}
-                />
               </CardContent>
             </Card>
 

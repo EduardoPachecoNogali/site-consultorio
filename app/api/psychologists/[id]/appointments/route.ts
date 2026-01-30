@@ -117,16 +117,18 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   if (!isGroup) {
-    const normalizedSlots = slots.map((slot: { date: string; time: string }) => ({
-      date: normalizeDate(slot.date),
-      time: slot.time,
-    }))
+    const normalizedSlots: Array<{ date: Date; time: string }> = slots.map(
+      (slot: { date: string; time: string }) => ({
+        date: normalizeDate(slot.date),
+        time: slot.time,
+      }),
+    )
 
     const conflict = await prisma.appointment.findFirst({
       where: {
         psychologistId: id,
         status: { notIn: ['cancelled'] },
-        OR: normalizedSlots.map((slot) => ({
+        OR: normalizedSlots.map((slot: { date: Date; time: string }) => ({
           date: slot.date,
           time: slot.time,
         })),

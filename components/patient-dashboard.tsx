@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Calendar } from '@/components/ui/calendar'
+import type { DayButtonProps } from 'react-day-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Brain, Calendar as CalendarIcon, Clock, Video, User, LogOut, CalendarClock, CheckCircle2, AlertCircle, Link2 } from 'lucide-react'
@@ -293,22 +294,18 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
     [availableDates],
   )
 
-  const CalendarDayContent = ({
-    date,
-    activeModifiers,
-  }: {
-    date: Date
-    activeModifiers: { [key: string]: boolean }
-  }) => {
-    const day = date.getDate()
-    const hasAvailability = activeModifiers.available
+  const CalendarDayContent = ({ day, modifiers, className, ...props }: DayButtonProps) => {
+    const dayNumber = day.date.getDate()
+    const hasAvailability = Boolean(modifiers.available)
     return (
-      <div className="flex flex-col items-center">
-        <span>{day}</span>
-        <span className="mt-1 flex items-center">
-          {hasAvailability && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-        </span>
-      </div>
+      <button {...props} className={className}>
+        <div className="flex flex-col items-center">
+          <span>{dayNumber}</span>
+          <span className="mt-1 flex items-center">
+            {hasAvailability && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+          </span>
+        </div>
+      </button>
     )
   }
 
@@ -571,7 +568,7 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                       selected={selectedDate}
                       onSelect={(date) => date && setSelectedDate(date)}
                       modifiers={calendarModifiers}
-                      components={{ DayContent: CalendarDayContent }}
+                      components={{ DayButton: CalendarDayContent }}
                       className="rounded-md border-0"
                     />
 

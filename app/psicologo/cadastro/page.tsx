@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Brain } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
 
-export default function PsychologistRegistrationPage() {
+function PsychologistRegistrationContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token')
@@ -159,5 +159,13 @@ export default function PsychologistRegistrationPage() {
         </Card>
       </div>
     </main>
+  )
+}
+
+export default function PsychologistRegistrationPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Carregando...</p>}>
+      <PsychologistRegistrationContent />
+    </Suspense>
   )
 }
