@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Mail, ShieldCheck } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
 import { PsychologistProfile } from '@/lib/psychologists'
+import { readJson } from '@/lib/http'
 
 interface NewPsychologistForm {
   name: string
@@ -26,6 +27,7 @@ export default function AdminPsychologistsPage() {
   const [psychologistRequests, setPsychologistRequests] = useState<PsychologistProfile[]>([])
   const [approvedPsychologists, setApprovedPsychologists] = useState<PsychologistProfile[]>([])
   const [isLoadingRequests, setIsLoadingRequests] = useState(false)
+  const [hasLoadedRequests, setHasLoadedRequests] = useState(false)
   const [requestsError, setRequestsError] = useState('')
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
@@ -56,10 +58,10 @@ export default function AdminPsychologistsPage() {
     try {
       const response = await fetch('/api/psychologists')
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Não foi possível carregar as solicitações.')
       }
-      const data = await response.json()
+      const data = await readJson<{ psychologists?: PsychologistProfile[] }>(response)
       const pending = (data.psychologists || []).filter(
         (psychologist: PsychologistProfile) => psychologist.status === 'pending',
       )
@@ -72,6 +74,7 @@ export default function AdminPsychologistsPage() {
       setRequestsError(error.message || 'Não foi possível carregar as solicitações.')
     } finally {
       setIsLoadingRequests(false)
+      setHasLoadedRequests(true)
     }
   }
 
@@ -84,6 +87,16 @@ export default function AdminPsychologistsPage() {
       loadPsychologistRequests()
     }
   }, [isAuthenticated])
+
+  const isInitialLoading = isCheckingAuth || (isAuthenticated && !hasLoadedRequests)
+
+  if (isInitialLoading) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </main>
+    )
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -103,7 +116,7 @@ export default function AdminPsychologistsPage() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Credenciais inválidas.')
       }
 
@@ -145,11 +158,11 @@ export default function AdminPsychologistsPage() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
+        const error = await readJson<{ error?: string }>(response, {})
         throw new Error(error.error || 'Erro ao criar cadastro.')
       }
 
-      const data = await response.json()
+      const data = await readJson<{ psychologist?: { id?: string } }>(response)
       const psychologistId = data.psychologist?.id
 
       if (psychologistId) {
@@ -158,7 +171,7 @@ export default function AdminPsychologistsPage() {
           { method: 'POST' },
         )
         if (!approveResponse.ok) {
-          const error = await approveResponse.json()
+          const error = await readJson<{ error?: string }>(approveResponse, {})
           throw new Error(error.error || 'Cadastro criado, mas não foi possível enviar o convite.')
         }
       }
@@ -180,7 +193,7 @@ export default function AdminPsychologistsPage() {
         method: 'POST',
       })
       if (!response.ok) {
-        const error = await response.json()
+        const error = await readJson<{ error?: string }>(response, {})
         throw new Error(error.error || 'Não foi possível aprovar o cadastro.')
       }
       await loadPsychologistRequests()
@@ -199,7 +212,7 @@ export default function AdminPsychologistsPage() {
         method: 'POST',
       })
       if (!response.ok) {
-        const error = await response.json()
+        const error = await readJson<{ error?: string }>(response, {})
         throw new Error(error.error || 'Não foi possível reenviar o convite.')
       }
       setResendFeedback('Convite reenviado com sucesso.')

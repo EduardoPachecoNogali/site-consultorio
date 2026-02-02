@@ -11,6 +11,7 @@ import { Brain } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PsychologistProfile } from '@/lib/psychologists'
 import { appConfig } from '@/lib/app-config'
+import { readJson } from '@/lib/http'
 
 interface AuthScreenProps {
   onLogin: (name: string, email: string) => void
@@ -19,6 +20,7 @@ interface AuthScreenProps {
 
 export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
   const searchParams = useSearchParams()
+  const [isReady, setIsReady] = useState(false)
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [signupName, setSignupName] = useState('')
@@ -71,6 +73,18 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
     }
   }, [hasAutoOpenedDialog, searchParams])
 
+  useEffect(() => {
+    setIsReady(true)
+  }, [])
+
+  if (!isReady) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    )
+  }
+
   const handlePsychologistTabChange = (value: string) => {
     const mode = value === 'request' ? 'request' : 'login'
     setPsychologistDialogMode(mode)
@@ -112,10 +126,10 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
     })
       .then(async (response) => {
         if (!response.ok) {
-          const data = await response.json()
+          const data = await readJson<{ error?: string }>(response, {})
           throw new Error(data.error || 'Erro ao validar credenciais.')
         }
-        return response.json()
+        return readJson<{ psychologist: PsychologistProfile }>(response)
       })
       .then((data: { psychologist: PsychologistProfile }) => {
         onPsychologistLogin(data.psychologist)
@@ -151,7 +165,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Não foi possível enviar a solicitação.')
       }
 

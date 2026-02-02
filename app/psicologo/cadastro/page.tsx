@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Brain } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
+import { readJson } from '@/lib/http'
 
 function PsychologistRegistrationContent() {
   const searchParams = useSearchParams()
@@ -34,10 +35,10 @@ function PsychologistRegistrationContent() {
         setIsLoading(true)
         const response = await fetch(`/api/psychologists/register?token=${token}`)
         if (!response.ok) {
-          const data = await response.json()
+          const data = await readJson<{ error?: string }>(response, {})
           throw new Error(data.error || 'Não foi possível validar o convite.')
         }
-        const data = await response.json()
+        const data = await readJson<{ psychologist?: { name?: string; email?: string } }>(response)
         setName(data.psychologist?.name || '')
         setEmail(data.psychologist?.email || '')
       } catch (error: any) {
@@ -74,7 +75,7 @@ function PsychologistRegistrationContent() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao concluir cadastro.')
       }
 

@@ -20,16 +20,21 @@ export default function Page() {
     try {
       const stored = localStorage.getItem('mindcare-session')
       if (stored) {
-        const parsed = JSON.parse(stored) as {
-          currentView?: ViewType
-          userName?: string
-          userEmail?: string
-          psychologistId?: string | null
+        try {
+          const parsed = JSON.parse(stored) as {
+            currentView?: ViewType
+            userName?: string
+            userEmail?: string
+            psychologistId?: string | null
+          }
+          if (parsed.currentView) setCurrentView(parsed.currentView)
+          if (parsed.userName) setUserName(parsed.userName)
+          if (parsed.userEmail) setUserEmail(parsed.userEmail)
+          if (parsed.psychologistId) setPsychologistId(parsed.psychologistId)
+        } catch {
+          console.warn('[session] sessão inválida, limpando armazenamento')
+          localStorage.removeItem('mindcare-session')
         }
-        if (parsed.currentView) setCurrentView(parsed.currentView)
-        if (parsed.userName) setUserName(parsed.userName)
-        if (parsed.userEmail) setUserEmail(parsed.userEmail)
-        if (parsed.psychologistId) setPsychologistId(parsed.psychologistId)
       }
     } catch (error) {
       console.warn('[session] falha ao restaurar sessão', error)

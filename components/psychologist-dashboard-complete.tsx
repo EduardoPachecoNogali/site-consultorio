@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import { readJson } from '@/lib/http'
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
 type AttendanceStatus = 'pending' | 'present' | 'absent' | 'excused'
@@ -250,6 +251,7 @@ export function PsychologistDashboard({
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [hasLoadedDashboard, setHasLoadedDashboard] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionSuccess, setActionSuccess] = useState('')
@@ -271,10 +273,10 @@ export function PsychologistDashboard({
       console.log('[dashboard] carregando dados', { psychologistId })
       const response = await fetch(`/api/psychologists/${psychologistId}/dashboard`)
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao carregar dados.')
       }
-      const data = (await response.json()) as DashboardPayload
+      const data = await readJson<DashboardPayload>(response)
       const hydrated = hydrateDashboard(data)
       setPatientProfiles(hydrated.patients)
       setAppointments(hydrated.appointments)
@@ -291,6 +293,7 @@ export function PsychologistDashboard({
       setLoadError(error.message || 'Erro ao carregar dados.')
     } finally {
       setIsLoading(false)
+      setHasLoadedDashboard(true)
     }
   }, [psychologistId])
 
@@ -298,6 +301,14 @@ export function PsychologistDashboard({
     if (!psychologistId) return
     loadDashboard()
   }, [psychologistId, loadDashboard])
+
+  if (isLoading && !hasLoadedDashboard) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    )
+  }
 
   const todayAppointments = appointments.filter(
     (apt) => apt.date.toDateString() === selectedDate.toDateString()
@@ -346,7 +357,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao atualizar consulta.')
       }
 
@@ -455,7 +466,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao criar consulta.')
       }
 
@@ -482,7 +493,7 @@ export function PsychologistDashboard({
         { method: 'DELETE' },
       )
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao excluir consulta.')
       }
       await loadDashboard()
@@ -511,11 +522,11 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao enviar notificação.')
       }
 
-      const data = await response.json().catch(() => ({}))
+      const data = await readJson<{ contact?: string; mocked?: boolean; meetingUrl?: string }>(response, {})
       const resolvedContact = data.contact || contact
       const label = 'Email'
       const prefix = data.mocked ? '✓ Notificação simulada' : '✓ Notificação enviada'
@@ -547,10 +558,10 @@ export function PsychologistDashboard({
         `/api/psychologists/${psychologistId}/google/authorize`,
       )
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao iniciar conexão com o Google.')
       }
-      const data = await response.json()
+      const data = await readJson<{ url?: string }>(response, {})
       if (!data?.url) {
         throw new Error('URL de autorização não encontrada.')
       }
@@ -637,11 +648,11 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao salvar disponibilidade.')
       }
 
-      const data = await response.json()
+      const data = await readJson<{ availability?: AvailabilityConfig }>(response)
       setAvailability(normalizeAvailability(data.availability))
       setActionSuccess('Disponibilidade atualizada com sucesso.')
     } catch (error: any) {
@@ -705,7 +716,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao atualizar paciente.')
       }
 
@@ -753,7 +764,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao salvar prontuário.')
       }
 
@@ -792,7 +803,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao atualizar prontuário.')
       }
 
@@ -820,7 +831,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao excluir prontuário.')
       }
 
@@ -855,7 +866,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao atualizar lembrete.')
       }
 
@@ -891,7 +902,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao criar lembrete.')
       }
 
@@ -920,7 +931,7 @@ export function PsychologistDashboard({
       )
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Erro ao excluir lembrete.')
       }
 

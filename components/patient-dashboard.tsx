@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Brain, Calendar as CalendarIcon, Clock, Video, User, LogOut, CalendarClock, CheckCircle2, AlertCircle, Link2 } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
+import { readJson } from '@/lib/http'
 
 interface PatientDashboardProps {
   userName: string
@@ -44,10 +45,12 @@ type AvailabilitySlot = {
 export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: PatientDashboardProps) {
   const [nextAppointment, setNextAppointment] = useState<NextAppointment>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasLoadedNext, setHasLoadedNext] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [psychologists, setPsychologists] = useState<PsychologistOption[]>([])
   const [psychologistError, setPsychologistError] = useState('')
   const [isLoadingPsychologists, setIsLoadingPsychologists] = useState(false)
+  const [hasLoadedPsychologists, setHasLoadedPsychologists] = useState(false)
   const [selectedPsychologistId, setSelectedPsychologistId] = useState('')
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([])
@@ -74,10 +77,10 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
             setNextAppointment(null)
             return null
           }
-          const data = await response.json()
+          const data = await readJson<{ error?: string }>(response, {})
           throw new Error(data.error || 'Não foi possível carregar a próxima consulta.')
         }
-        return response.json()
+        return readJson<{ appointment: { id: string; psychologistName: string; specialty: string; date: string; time: string; meetingUrl: string } }>(response)
       })
       .then((data) => {
         if (!data) return
@@ -93,7 +96,10 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
       .catch((error: Error) => {
         setLoadError(error.message)
       })
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        setIsLoading(false)
+        setHasLoadedNext(true)
+      })
   }, [userEmail])
 
   useEffect(() => {
@@ -103,10 +109,10 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
     fetch('/api/psychologists/public')
       .then(async (response) => {
         if (!response.ok) {
-          const data = await response.json()
+          const data = await readJson<{ error?: string }>(response, {})
           throw new Error(data.error || 'Não foi possível carregar os profissionais.')
         }
-        return response.json()
+        return readJson<{ psychologists: PsychologistOption[] }>(response)
       })
       .then((data) => {
         setPsychologists(data.psychologists || [])
@@ -114,8 +120,21 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
       .catch((error: Error) => {
         setPsychologistError(error.message)
       })
-      .finally(() => setIsLoadingPsychologists(false))
+      .finally(() => {
+        setIsLoadingPsychologists(false)
+        setHasLoadedPsychologists(true)
+      })
   }, [])
+
+  const isInitialLoading = !hasLoadedNext || !hasLoadedPsychologists
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    )
+  }
 
   const fetchAvailability = async (psychologistId: string, preference: string) => {
     if (!psychologistId) return
@@ -135,10 +154,10 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
         }`,
       )
       if (!response.ok) {
-        const data = await response.json()
+        const data = await readJson<{ error?: string }>(response, {})
         throw new Error(data.error || 'Não foi possível carregar horários.')
       }
-      const data = await response.json()
+      const data = await readJson<{ slots?: AvailabilitySlot[]; suggestedSlots?: AvailabilitySlot[] }>(response)
       setAvailableSlots(data.slots || [])
       setSuggestedSlots(data.suggestedSlots || [])
       if (data.slots?.length) {
