@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 
 const SESSION_COOKIE = 'admin_session'
 const SESSION_TTL_DAYS = 7
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || ''
+const isSecureCookie = appUrl.startsWith('https://')
 
 export async function createAdminSession(adminId: string) {
   const token = crypto.randomBytes(32).toString('hex')
@@ -22,7 +24,7 @@ export async function createAdminSession(adminId: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureCookie,
     expires: expiresAt,
     path: '/',
   })
@@ -37,7 +39,7 @@ export async function clearAdminSession() {
   cookieStore.set(SESSION_COOKIE, '', {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureCookie,
     expires: new Date(0),
     path: '/',
   })
