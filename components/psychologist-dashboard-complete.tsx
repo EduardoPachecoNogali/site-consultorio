@@ -302,14 +302,6 @@ export function PsychologistDashboard({
     loadDashboard()
   }, [psychologistId, loadDashboard])
 
-  if (isLoading && !hasLoadedDashboard) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Carregando...</p>
-      </div>
-    )
-  }
-
   const todayAppointments = appointments.filter(
     (apt) => apt.date.toDateString() === selectedDate.toDateString()
   )
@@ -1199,6 +1191,14 @@ export function PsychologistDashboard({
           patient.name.toLowerCase().includes(patientNameQuery)
         )
       : []
+
+  if (isLoading && !hasLoadedDashboard) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">

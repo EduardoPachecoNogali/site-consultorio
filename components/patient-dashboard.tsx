@@ -128,14 +128,6 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
 
   const isInitialLoading = !hasLoadedNext || !hasLoadedPsychologists
 
-  if (isInitialLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Carregando...</p>
-      </div>
-    )
-  }
-
   const fetchAvailability = async (psychologistId: string, preference: string) => {
     if (!psychologistId) return
     setIsLoadingSlots(true)
@@ -325,6 +317,14 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
           </span>
         </div>
       </button>
+    )
+  }
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
     )
   }
 
