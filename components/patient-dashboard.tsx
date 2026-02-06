@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Brain, Calendar as CalendarIcon, Clock, Video, User, LogOut, CalendarClock, CheckCircle2, AlertCircle, Link2 } from 'lucide-react'
 import { appConfig } from '@/lib/app-config'
+import { cn } from '@/lib/utils'
 import { readJson } from '@/lib/http'
 
 interface PatientDashboardProps {
@@ -298,22 +299,44 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
     return availableSlots.filter((slot) => slot.date === key)
   }, [availableSlots, selectedDate])
 
+  const selectedSlotDates = useMemo(() => {
+    if (!selectedSlot) return []
+    return [new Date(`${selectedSlot.date}T12:00:00`)]
+  }, [selectedSlot])
+
   const calendarModifiers = useMemo(
     () => ({
       available: availableDates,
+      selectedSlot: selectedSlotDates,
     }),
-    [availableDates],
+    [availableDates, selectedSlotDates],
   )
 
   const CalendarDayContent = ({ day, modifiers, className, ...props }: DayButtonProps) => {
     const dayNumber = day.date.getDate()
     const hasAvailability = Boolean(modifiers.available)
+    const isSelectedSlot = Boolean(modifiers.selectedSlot)
     return (
-      <button {...props} className={className}>
+      <button
+        {...props}
+        className={cn(
+          className,
+          isSelectedSlot &&
+            'bg-emerald-500/20 text-emerald-900 ring-2 ring-emerald-500/40 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]',
+          'transition-colors',
+        )}
+      >
         <div className="flex flex-col items-center">
           <span>{dayNumber}</span>
           <span className="mt-1 flex items-center">
-            {hasAvailability && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+            {hasAvailability && (
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  isSelectedSlot ? 'bg-emerald-500' : 'bg-primary',
+                )}
+              />
+            )}
           </span>
         </div>
       </button>
@@ -471,11 +494,12 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
               <CardContent className="space-y-6">
                 {(bookingError || bookingSuccess) && (
                   <div
-                    className={`flex items-start gap-2 rounded-md border px-4 py-3 text-sm ${
+                    className={cn(
+                      'flex items-start gap-2 rounded-md border px-4 py-3 text-sm',
                       bookingError
                         ? 'border-destructive/30 bg-destructive/10 text-destructive'
-                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    }`}
+                        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 animate-in fade-in-0 zoom-in-95 duration-300',
+                    )}
                   >
                     {bookingError ? (
                       <AlertCircle className="mt-0.5 h-4 w-4" />
@@ -585,7 +609,15 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                     <Calendar
                       mode="single"
                       selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
+                      onSelect={(date) => {
+                        if (!date) return
+                        const prevKey = selectedDate.toISOString().slice(0, 10)
+                        const nextKey = date.toISOString().slice(0, 10)
+                        setSelectedDate(date)
+                        if (prevKey !== nextKey) {
+                          setSelectedSlot(null)
+                        }
+                      }}
                       modifiers={calendarModifiers}
                       components={{ DayButton: CalendarDayContent }}
                       className="rounded-md border-0"
