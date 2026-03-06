@@ -1,11 +1,11 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const _inter = Inter({ subsets: ['latin'], display: 'swap' })
+const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
 const appName = process.env.NEXT_PUBLIC_APP_NAME || 'PsicoLink'
 const appDescription =
