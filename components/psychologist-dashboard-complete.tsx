@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, KeyboardEvent } from 'react'
-import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Phone, Stethoscope, TrendingUp, Users, Tag, CalendarClock, AlertCircle, CheckCircle2, Download } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, User, Search, Plus, Edit, ChevronLeft, ChevronRight, LogOut, FileText, Video, Trash2, Mail, Check, X, Phone, Stethoscope, TrendingUp, Users, Tag, CalendarClock, AlertCircle, CheckCircle2, Download, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { readJson } from '@/lib/http'
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 type AppointmentStatus = 'upcoming' | 'in-progress' | 'completed' | 'cancelled' | 'rescheduled'
 type AttendanceStatus = 'pending' | 'present' | 'absent' | 'excused'
@@ -219,7 +220,7 @@ export function PsychologistDashboard({
   const [newRecordTitle, setNewRecordTitle] = useState('')
   const [newRecordContent, setNewRecordContent] = useState('')
   const [newRecordTags, setNewRecordTags] = useState('')
-  
+
   // Novo formulário de consulta
   const [newAppointment, setNewAppointment] = useState({
     patientName: '',
@@ -264,6 +265,17 @@ export function PsychologistDashboard({
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [reportPatientId, setReportPatientId] = useState('')
+
+  const sparklineData = useMemo(() => {
+    const data = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const count = appointments.filter(a => a.date.toDateString() === d.toDateString()).length;
+      data.push({ name: d.toLocaleDateString('pt-BR', { weekday: 'short' }), uv: count });
+    }
+    return data.reverse();
+  }, [appointments]);
 
   const loadDashboard = useCallback(async () => {
     if (!psychologistId) return
@@ -1060,7 +1072,7 @@ export function PsychologistDashboard({
   const getStatusColor = (status: AppointmentStatus) => {
     switch (status) {
       case 'completed':
-        return 'bg-[#f2e9ff] text-[#4c1e70] border-[#d7bcff]'
+        return 'bg-secondary/20 text-secondary-foreground border-secondary/20'
       case 'in-progress':
         return 'bg-blue-500/10 text-blue-700 border-blue-500/20'
       case 'upcoming':
@@ -1094,7 +1106,7 @@ export function PsychologistDashboard({
       case 'blue':
         return 'bg-blue-500/10 border-blue-500/20'
       case 'green':
-        return 'bg-[#f2e9ff] border-[#d7bcff]'
+        return 'bg-secondary/20 border-secondary/20'
       case 'red':
         return 'bg-red-500/10 border-red-500/20'
     }
@@ -1107,7 +1119,7 @@ export function PsychologistDashboard({
       case 'blue':
         return 'text-blue-700'
       case 'green':
-        return 'text-[#4c1e70]'
+        return 'text-secondary-foreground'
       case 'red':
         return 'text-red-700'
     }
@@ -1204,7 +1216,7 @@ export function PsychologistDashboard({
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                 <User className="h-5 w-5 text-primary" />
@@ -1258,44 +1270,65 @@ export function PsychologistDashboard({
           <div className="lg:col-span-2 space-y-6">
             {/* Stats Cards */}
             <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="border-border/50">
+            <Card className="shadow-lg">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <CalendarIcon className="h-5 w-5 text-primary" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                      <CalendarIcon className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-semibold text-foreground">{stats.total}</p>
+                      <p className="text-3xl font-serif text-foreground">{stats.total}</p>
                       <p className="text-xs text-muted-foreground">Consultas Hoje</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f2e9ff]">
-                      <Check className="h-5 w-5 text-[#5a238a]" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-semibold text-foreground">{stats.completed}</p>
-                      <p className="text-xs text-muted-foreground">Concluídas</p>
-                    </div>
+                  <div className="h-10 mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={sparklineData}>
+                        <Line type="monotone" dataKey="uv" stroke="hsl(var(--primary))" strokeWidth={2} dot={false}/>
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/50">
+              <Card className="shadow-lg">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                      <Clock className="h-5 w-5 text-amber-600" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/20">
+                      <CheckCircle className="h-6 w-6 text-secondary-foreground" />
                     </div>
                     <div>
-                      <p className="text-2xl font-semibold text-foreground">{stats.upcoming}</p>
+                      <p className="text-3xl font-serif text-foreground">{stats.completed}</p>
+                      <p className="text-xs text-muted-foreground">Concluídas</p>
+                    </div>
+                  </div>
+                   <div className="h-10 mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={sparklineData}>
+                        <Line type="monotone" dataKey="uv" stroke="hsl(var(--secondary))" strokeWidth={2} dot={false}/>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Clock className="h-6 w-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-3xl font-serif text-foreground">{stats.upcoming}</p>
                       <p className="text-xs text-muted-foreground">Pendentes</p>
                     </div>
+                  </div>
+                   <div className="h-10 mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={sparklineData}>
+                        <Line type="monotone" dataKey="uv" stroke="hsl(var(--accent))" strokeWidth={2} dot={false}/>
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
@@ -1391,7 +1424,7 @@ export function PsychologistDashboard({
                                 Nova Consulta
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
                               <DialogHeader>
                                 <DialogTitle>Agendar Nova Consulta</DialogTitle>
                                 <DialogDescription>
@@ -1805,566 +1838,155 @@ export function PsychologistDashboard({
                     <ScrollArea className="h-[600px] pr-4">
                       {filteredAppointments.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                          <CalendarIcon className="h-12 w-12 text-muted-foreground/50" />
-                          <p className="mt-4 text-sm text-muted-foreground">
-                            Nenhuma consulta encontrada para esta data
+                          <svg
+                            className="h-24 w-24 text-muted-foreground/30"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                            <path d="M8 14h.01"></path>
+                            <path d="M12 14h.01"></path>
+                            <path d="M16 14h.01"></path>
+                            <path d="M8 18h.01"></path>
+                            <path d="M12 18h.01"></path>
+                            <path d="M16 18h.01"></path>
+                          </svg>
+                          <p className="mt-4 text-sm font-medium text-foreground">
+                            Nenhuma consulta para hoje
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            A agenda para o dia selecionado aparecerá aqui.
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="relative space-y-4">
+                          <div className="absolute left-4 top-4 bottom-4 w-px bg-border -z-10"></div>
                           {filteredAppointments.map((appointment) => (
-                            <div
-                              key={appointment.id}
-                              className="group relative rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
-                            >
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1 space-y-3">
-                                  <div className="flex items-start justify-between">
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold text-foreground">
-                                          {appointment.patientName}
-                                        </h3>
-                                        <Badge
-                                          variant="outline"
-                                          className={getStatusColor(appointment.status)}
-                                        >
-                                          {getStatusLabel(appointment.status)}
-                                        </Badge>
-                                        {appointment.isGroup && (
-                                          <Badge variant="outline" className="border-blue-500/30 text-blue-700">
-                                            <Users className="mr-1 h-3 w-3" />
-                                            Grupo
+                             <div key={appointment.id} className="relative flex gap-4 items-start">
+                               <div className="flex-shrink-0 w-20 text-right">
+                                  <p className="text-sm font-semibold text-foreground">{appointment.time}</p>
+                                  <p className="text-xs text-muted-foreground">{parseInt(appointment.time) + 1}:00</p>
+                               </div>
+                               <div className="flex-shrink-0 mt-1">
+                                  <div className={`w-3 h-3 rounded-full ${getStatusColor(appointment.status)}`}></div>
+                               </div>
+                               <div className="flex-1 space-y-2">
+                                <div className="group relative rounded-lg border border-border/50 bg-card p-3 transition-all hover:border-primary/50 hover:shadow-md">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1 space-y-3">
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <h3 className="font-semibold text-foreground">
+                                            {appointment.patientName}
+                                          </h3>
+                                          <Badge
+                                            variant="outline"
+                                            className={getStatusColor(appointment.status)}
+                                          >
+                                            {getStatusLabel(appointment.status)}
                                           </Badge>
-                                        )}
-                                        {appointment.groupRequested && !appointment.isGroup && (
-                                          <Badge variant="outline" className="border-amber-500/30 text-amber-700">
-                                            Solicitação de grupo
-                                          </Badge>
-                                        )}
-                                        <Badge variant="outline" className="border-border/50 text-muted-foreground">
-                                          {appointment.attendanceStatus === 'present'
-                                            ? 'Compareceu'
-                                            : appointment.attendanceStatus === 'absent'
-                                              ? 'Faltou'
-                                              : appointment.attendanceStatus === 'excused'
-                                                ? 'Justificado'
-                                                : 'Presença pendente'}
-                                        </Badge>
-                                      </div>
-                                      <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                          <Clock className="h-3.5 w-3.5" />
-                                          {appointment.time}
-                                        </span>
-                                        <span>•</span>
-                                        <span>{appointment.duration}</span>
-                                        <span>•</span>
-                                        <span className="flex items-center gap-1">
-                                          <Mail className="h-3.5 w-3.5" />
-                                          Email
-                                        </span>
+                                        </div>
                                       </div>
                                     </div>
-
-                                    <div className="flex items-center gap-1">
-                                      {appointment.status === 'upcoming' && (
-                                        <Button
-                                          variant="default"
-                                          size="sm"
-                                          className="gap-2"
-                                          onClick={() => handleStartCall(appointment)}
-                                        >
-                                          <Video className="h-4 w-4" />
-                                          Iniciar Chamada
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {appointment.notes && (
-                                    <div className="rounded-md bg-muted/50 p-3">
-                                      <p className="text-sm text-muted-foreground">{appointment.notes}</p>
-                                    </div>
-                                  )}
-
-                                  {appointment.reason && (
-                                    <div className="rounded-md border border-border/60 bg-background p-3 text-sm text-muted-foreground">
-                                      <span className="font-medium text-foreground">Motivo:</span>{' '}
-                                      {appointment.reason}
-                                    </div>
-                                  )}
-
-                              {appointment.groupRequested && appointment.groupRequestNote && !appointment.isGroup && (
-                                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800">
-                                  <span className="font-medium">Solicitação de grupo:</span>{' '}
-                                  {appointment.groupRequestNote}
-                                </div>
-                              )}
-
-                              {appointment.isGroup && (
-                                <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                                  <span className="font-medium text-foreground">Grupo:</span>{' '}
-                                  {appointment.groupName || 'Consulta em grupo'}
-                                  {appointment.groupParticipants.length > 0 && (
-                                    <span>
-                                      {' '}
-                                      • {appointment.groupParticipants.length} participante(s)
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {(appointment.tags.length > 0 || appointment.groupTags.length > 0) && (
-                                <div className="flex flex-wrap gap-2">
-                                  {appointment.tags.map((tag) => (
-                                    <Badge key={`tag-${appointment.id}-${tag}`} variant="secondary">
-                                      <Tag className="mr-1 h-3 w-3" />
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                  {appointment.groupTags.map((tag) => (
-                                    <Badge key={`group-tag-${appointment.id}-${tag}`} variant="outline">
-                                      <Users className="mr-1 h-3 w-3" />
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
-
-                              <div className="flex items-center gap-2 pt-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-2 bg-transparent"
-                                  onClick={() => handleViewPatientProfile(appointment.patientId)}
-                                >
-                                  <User className="h-4 w-4" />
-                                  Ver Perfil
-                                </Button>
-
-                                <Dialog
-                                  open={isEditDialogOpen && editingAppointment?.id === appointment.id}
-                                  onOpenChange={(open) => {
-                                    setIsEditDialogOpen(open)
-                                    if (!open) setEditingAppointment(null)
-                                  }}
-                                >
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="gap-2 bg-transparent"
-                                      onClick={() => {
-                                        setEditingAppointment({
-                                          ...appointment,
-                                          notificationPreference: 'email',
-                                        })
-                                        setIsEditDialogOpen(true)
-                                      }}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                      Editar
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-2xl">
-                                    <DialogHeader>
-                                      <DialogTitle>Editar Consulta</DialogTitle>
-                                      <DialogDescription>
-                                        Altere os detalhes da consulta
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    {editingAppointment && (
-                                      <div className="space-y-4 py-4">
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                          <div className="space-y-2">
-                                            <Label htmlFor="edit-time">Horário</Label>
-                                            <Input
-                                              id="edit-time"
-                                              type="time"
-                                              value={editingAppointment.time}
-                                              onChange={(e) =>
-                                                setEditingAppointment({
-                                                  ...editingAppointment,
-                                                  time: e.target.value,
-                                                })
-                                              }
-                                            />
-                                          </div>
-
-                                          <div className="space-y-2">
-                                            <Label htmlFor="edit-status">Status</Label>
-                                            <Select
-                                              value={editingAppointment.status}
-                                              onValueChange={(value: AppointmentStatus) =>
-                                                setEditingAppointment({
-                                                  ...editingAppointment,
-                                                  status: value,
-                                                })
-                                              }
-                                            >
-                                              <SelectTrigger id="edit-status">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="upcoming">Agendada</SelectItem>
-                                                <SelectItem value="in-progress">Em andamento</SelectItem>
-                                                <SelectItem value="completed">Concluída</SelectItem>
-                                                <SelectItem value="cancelled">Cancelada</SelectItem>
-                                                <SelectItem value="rescheduled">Remarcada</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        </div>
-
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                          <div className="space-y-2">
-                                            <Label htmlFor="edit-attendance">Presença</Label>
-                                            <Select
-                                              value={editingAppointment.attendanceStatus}
-                                              onValueChange={(value: AttendanceStatus) =>
-                                                setEditingAppointment({
-                                                  ...editingAppointment,
-                                                  attendanceStatus: value,
-                                                })
-                                              }
-                                            >
-                                              <SelectTrigger id="edit-attendance">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="pending">Pendente</SelectItem>
-                                                <SelectItem value="present">Compareceu</SelectItem>
-                                                <SelectItem value="absent">Faltou</SelectItem>
-                                                <SelectItem value="excused">Justificado</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                          <div className="space-y-2">
-                                            <Label htmlFor="edit-duration">Duração</Label>
-                                            <Input
-                                              id="edit-duration"
-                                              value={editingAppointment.duration}
-                                              onChange={(e) =>
-                                                setEditingAppointment({
-                                                  ...editingAppointment,
-                                                  duration: e.target.value,
-                                                })
-                                              }
-                                            />
-                                          </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label htmlFor="edit-date">Data</Label>
-                                          <Popover>
-                                            <PopoverTrigger asChild>
-                                              <Button
-                                                variant="outline"
-                                                className="w-full justify-start gap-2 bg-transparent"
-                                              >
-                                                <CalendarIcon className="h-4 w-4" />
-                                                {editingAppointment.date.toLocaleDateString('pt-BR')}
-                                              </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                              <Calendar
-                                                mode="single"
-                                                selected={editingAppointment.date}
-                                                onSelect={(date) =>
-                                                  date &&
-                                                  setEditingAppointment({
-                                                    ...editingAppointment,
-                                                    date,
-                                                  })
-                                                }
-                                              />
-                                            </PopoverContent>
-                                          </Popover>
-                                        </div>
-
-                                        <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <div>
-                                              <p className="text-sm font-medium text-foreground">
-                                                Consulta em grupo
-                                              </p>
-                                              <p className="text-xs text-muted-foreground">
-                                                Marque para associar participantes e tags coletivas.
-                                              </p>
-                                            </div>
-                                            <Switch
-                                              checked={editingAppointment.isGroup}
-                                              onCheckedChange={(checked) =>
-                                                setEditingAppointment({
-                                                  ...editingAppointment,
-                                                  isGroup: checked,
-                                                  groupRequested: checked
-                                                    ? false
-                                                    : editingAppointment.groupRequested,
-                                                })
-                                              }
-                                            />
-                                          </div>
-                                          {editingAppointment.groupRequested && !editingAppointment.isGroup && (
-                                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
-                                              Solicitação de grupo feita pelo paciente.
-                                            </div>
-                                          )}
-                                          {editingAppointment.isGroup && (
-                                            <div className="grid gap-4 sm:grid-cols-2">
-                                              <div className="space-y-2">
-                                                <Label htmlFor="edit-group-name">Nome do grupo</Label>
-                                                <Input
-                                                  id="edit-group-name"
-                                                  value={editingAppointment.groupName ?? ''}
-                                                  onChange={(e) =>
-                                                    setEditingAppointment({
-                                                      ...editingAppointment,
-                                                      groupName: e.target.value,
-                                                    })
-                                                  }
-                                                />
-                                              </div>
-                                              <div className="space-y-2">
-                                                <Label htmlFor="edit-group-size">Tamanho</Label>
-                                                <Input
-                                                  id="edit-group-size"
-                                                  type="number"
-                                                  min={2}
-                                                  value={editingAppointment.groupSize ?? ''}
-                                                  onChange={(e) =>
-                                                    setEditingAppointment({
-                                                      ...editingAppointment,
-                                                      groupSize: Number(e.target.value),
-                                                    })
-                                                  }
-                                                />
-                                              </div>
-                                              <div className="space-y-2 sm:col-span-2">
-                                                <Label htmlFor="edit-group-participants">
-                                                  Participantes (emails)
-                                                </Label>
-                                                <Input
-                                                  id="edit-group-participants"
-                                                  value={editingAppointment.groupParticipants.join(', ')}
-                                                  onChange={(e) =>
-                                                    setEditingAppointment({
-                                                      ...editingAppointment,
-                                                      groupParticipants: parseTags(e.target.value),
-                                                    })
-                                                  }
-                                                />
-                                              </div>
-                                              <div className="space-y-2 sm:col-span-2">
-                                                <Label htmlFor="edit-group-tags">Tags do grupo</Label>
-                                                <Input
-                                                  id="edit-group-tags"
-                                                  value={editingAppointment.groupTags.join(', ')}
-                                                  onChange={(e) =>
-                                                    setEditingAppointment({
-                                                      ...editingAppointment,
-                                                      groupTags: parseTags(e.target.value),
-                                                    })
-                                                  }
-                                                />
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label htmlFor="edit-notification">Preferência de Notificação</Label>
-                                          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                                            <Mail className="h-4 w-4" />
-                                            Email
-                                          </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label htmlFor="edit-reason">Motivo da Consulta</Label>
-                                          <Textarea
-                                            id="edit-reason"
-                                            value={editingAppointment.reason}
-                                            onChange={(e) =>
-                                              setEditingAppointment({
-                                                ...editingAppointment,
-                                                reason: e.target.value,
-                                              })
-                                            }
-                                            rows={3}
-                                          />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label htmlFor="edit-notes">Notas</Label>
-                                          <Textarea
-                                            id="edit-notes"
-                                            value={editingAppointment.notes}
-                                            onChange={(e) =>
-                                              setEditingAppointment({
-                                                ...editingAppointment,
-                                                notes: e.target.value,
-                                              })
-                                            }
-                                            rows={4}
-                                          />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label htmlFor="edit-tags">Tags privadas</Label>
-                                          <Input
-                                            id="edit-tags"
-                                            value={editingAppointment.tags.join(', ')}
-                                            onChange={(e) =>
-                                              setEditingAppointment({
-                                                ...editingAppointment,
-                                                tags: parseTags(e.target.value),
-                                              })
-                                            }
-                                          />
-                                        </div>
+                                    {appointment.reason && (
+                                      <div className="text-sm text-muted-foreground">
+                                        <span className="font-medium text-foreground">Motivo:</span>{' '}
+                                        {appointment.reason}
                                       </div>
                                     )}
-                                    <div className="flex justify-end gap-2">
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 pt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 bg-transparent"
+                                    onClick={() => handleViewPatientProfile(appointment.patientId)}
+                                  >
+                                    <User className="h-4 w-4" />
+                                    Ver Perfil
+                                  </Button>
+                                  <Dialog
+                                    open={isEditDialogOpen && editingAppointment?.id === appointment.id}
+                                    onOpenChange={(open) => {
+                                      setIsEditDialogOpen(open)
+                                      if (!open) setEditingAppointment(null)
+                                    }}
+                                  >
+                                    <DialogTrigger asChild>
                                       <Button
                                         variant="outline"
-                                        onClick={() => setIsEditDialogOpen(false)}
+                                        size="sm"
+                                        className="gap-2 bg-transparent"
+                                        onClick={() => {
+                                          setEditingAppointment({
+                                            ...appointment,
+                                            notificationPreference: 'email',
+                                          })
+                                          setIsEditDialogOpen(true)
+                                        }}
                                       >
-                                        Cancelar
+                                        <Edit className="h-4 w-4" />
+                                        Editar
                                       </Button>
-                                      <Button onClick={handleSaveAppointment}>Salvar</Button>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 bg-transparent"
-                                  onClick={() => handleDeleteAppointment(appointment.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Excluir
-                                </Button>
+                                    </DialogTrigger>
+                                  </Dialog>
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                               </div>
+                             </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )}
                     </ScrollArea>
                   </TabsContent>
-                  <TabsContent value="availability" className="mt-0 space-y-4">
-                    <div className="space-y-1">
-                      <h3 className="text-base font-semibold text-foreground">Disponibilidade</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Defina seus horários para o paciente agendar.
-                      </p>
-                    </div>
+                  <TabsContent value="availability" className="mt-0">
                     <div className="space-y-4">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold text-foreground">Disponibilidade Semanal</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Defina seus horários de atendimento recorrentes.
+                        </p>
+                      </div>
                       <div className="space-y-3">
-                        {weekDays.map((day) => (
-                          <div key={day.id} className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
-                            <Switch
-                              checked={availability.weekly[day.id]?.enabled}
-                              onCheckedChange={(checked) => handleUpdateAvailability(day.id, 'enabled', checked)}
-                            />
-                            <div className="text-xs text-muted-foreground">{day.label}</div>
+                        {weekDays.map(({ id, label }) => (
+                          <div key={id} className="grid gap-3 rounded-md border border-border/50 p-3 sm:grid-cols-[120px_1fr_1fr_auto] sm:items-center sm:border-0 sm:p-0">
                             <div className="flex items-center gap-2">
-                              <Input
-                                type="time"
-                                value={availability.weekly[day.id]?.start}
-                                onChange={(e) => handleUpdateAvailability(day.id, 'start', e.target.value)}
-                                className="h-8"
+                              <Switch
+                                checked={availability.weekly[id].enabled}
+                                onCheckedChange={(checked) => handleUpdateAvailability(id, 'enabled', checked)}
                               />
-                              <span className="text-xs text-muted-foreground">até</span>
-                              <Input
-                                type="time"
-                                value={availability.weekly[day.id]?.end}
-                                onChange={(e) => handleUpdateAvailability(day.id, 'end', e.target.value)}
-                                className="h-8"
-                              />
+                              <Label className="font-medium">{label}</Label>
                             </div>
+                            <Input
+                              type="time"
+                              value={availability.weekly[id].start}
+                              onChange={(e) => handleUpdateAvailability(id, 'start', e.target.value)}
+                              disabled={!availability.weekly[id].enabled}
+                            />
+                            <Input
+                              type="time"
+                              value={availability.weekly[id].end}
+                              onChange={(e) => handleUpdateAvailability(id, 'end', e.target.value)}
+                              disabled={!availability.weekly[id].enabled}
+                            />
                           </div>
                         ))}
                       </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="availability-slot">Duração (min)</Label>
-                          <Input
-                            id="availability-slot"
-                            type="number"
-                            min={20}
-                            value={availability.slotDurationMinutes}
-                            onChange={(e) =>
-                              setAvailability({
-                                ...availability,
-                                slotDurationMinutes: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="availability-buffer">Intervalo (min)</Label>
-                          <Input
-                            id="availability-buffer"
-                            type="number"
-                            min={0}
-                            value={availability.bufferMinutes}
-                            onChange={(e) =>
-                              setAvailability({
-                                ...availability,
-                                bufferMinutes: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-md border border-border/60 bg-muted/40 p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Permitir grupos</p>
-                            <p className="text-xs text-muted-foreground">
-                              Habilita agendamento de consultas coletivas.
-                            </p>
-                          </div>
-                          <Switch
-                            checked={availability.allowGroup}
-                            onCheckedChange={(checked) =>
-                              setAvailability({ ...availability, allowGroup: checked })
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="availability-max-group">Máximo de participantes</Label>
-                          <Input
-                            id="availability-max-group"
-                            type="number"
-                            min={2}
-                            value={availability.maxGroupSize}
-                            onChange={(e) =>
-                              setAvailability({ ...availability, maxGroupSize: Number(e.target.value) })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      {availabilityError && (
-                        <p className="text-xs text-destructive">{availabilityError}</p>
-                      )}
-                      <Button
-                        variant="outline"
-                        className="w-full gap-2"
-                        onClick={handleSaveAvailability}
-                        disabled={isSavingAvailability || !psychologistId}
-                      >
-                        <CalendarClock className="h-4 w-4" />
-                        {isSavingAvailability ? 'Salvando...' : 'Salvar disponibilidade'}
+                      <Button onClick={handleSaveAvailability} disabled={isSavingAvailability}>
+                        {isSavingAvailability ? 'Salvando...' : 'Salvar Disponibilidade'}
                       </Button>
+                      {availabilityError && (
+                        <p className="text-sm text-destructive">{availabilityError}</p>
+                      )}
                     </div>
                   </TabsContent>
                 </CardContent>
@@ -2372,817 +1994,292 @@ export function PsychologistDashboard({
             </Tabs>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card className="border-border/50">
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="text-foreground text-base">Calendário</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Consultas e lembretes com integração Google.
-                </CardDescription>
+                <CardTitle>Conexão com Google</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => date && setSelectedDate(date)}
-                  className="rounded-md border-0"
-                  modifiers={calendarModifiers}
-                  components={{ DayButton: CalendarDayContent }}
-                />
-                <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Consultas em {selectedDate.toLocaleDateString('pt-BR')}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {todayAppointments.length} consulta(s) no dia
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                        Consultas
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="h-2 w-2 rounded-full bg-amber-500" />
-                        Lembretes
-                      </span>
-                    </div>
+                <p className="text-sm text-muted-foreground">
+                  Conecte sua agenda do Google para sincronizar automaticamente seus horários e criar links de videochamada.
+                </p>
+                {googleStatus?.connected ? (
+                  <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-700">
+                    Conectado como <span className="font-medium">{googleStatus.email}</span> em {googleConnectedAtLabel}.
                   </div>
-                  {todayAppointments.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Sem consultas registradas para esta data.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {todayAppointments.slice(0, 3).map((appointment) => (
-                        <div
-                          key={appointment.id}
-                          className="flex items-center justify-between gap-2 rounded-md bg-background/80 px-2 py-1.5 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground">{appointment.time}</span>
-                            <span className="text-muted-foreground">{appointment.patientName}</span>
-                          </div>
-                          <Badge variant="outline" className={getStatusColor(appointment.status)}>
-                            {getStatusLabel(appointment.status)}
-                          </Badge>
-                        </div>
-                      ))}
-                      {todayAppointments.length > 3 && (
-                        <p className="text-xs text-muted-foreground">
-                          + {todayAppointments.length - 3} consulta(s) no dia
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <Separator />
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Google Calendar</p>
-                    <p className="text-xs text-muted-foreground">
-                      Gere links do Meet automaticamente nas consultas.
-                    </p>
-                  </div>
-                  {googleStatus?.connected ? (
-                    <div className="text-sm text-emerald-600">
-                      Conectado{googleStatus.email ? `: ${googleStatus.email}` : ''}
-                      {googleConnectedAtLabel ? ` em ${googleConnectedAtLabel}` : ''}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">Ainda não conectado.</div>
-                  )}
-                  {googleConnectError && (
-                    <p className="text-xs text-destructive">{googleConnectError}</p>
-                  )}
-                  <Button
-                    variant={googleStatus?.connected ? 'outline' : 'default'}
-                    className="w-full"
-                    onClick={handleConnectGoogle}
-                    disabled={isConnectingGoogle || !psychologistId}
-                  >
-                    {isConnectingGoogle
-                      ? 'Conectando...'
-                      : googleStatus?.connected
-                        ? 'Reconectar Google'
-                        : 'Conectar Google Calendar'}
+                ) : (
+                  <Button onClick={handleConnectGoogle} disabled={isConnectingGoogle} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                    <svg className="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5.03,16.42 5.03,12.5C5.03,8.58 8.36,5.73 12.19,5.73C14.03,5.73 15.6,6.33 16.84,7.48L18.83,5.48C17.06,3.87 14.86,3 12.19,3C7.24,3 3.19,6.66 3.19,12.5C3.19,18.34 7.24,22 12.19,22C17.14,22 21.5,18.33 21.5,12.71C21.5,12.09 21.43,11.59 21.35,11.1Z"></path>
+                    </svg>
+                    Conectar com Google Calendar
                   </Button>
-                </div>
+                )}
+                {googleConnectError && (
+                  <p className="text-sm text-destructive">{googleConnectError}</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Reminders */}
-            <Card className="border-border/50">
+            <Card className="shadow-lg">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-foreground text-base">Lembretes</CardTitle>
-                  <Dialog open={isAddReminderOpen} onOpenChange={setIsAddReminderOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Novo Lembrete</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="new-reminder-text">Texto</Label>
-                          <Textarea
-                            id="new-reminder-text"
-                            value={newReminderText}
-                            onChange={(e) => setNewReminderText(e.target.value)}
-                            placeholder="Digite o lembrete..."
-                            rows={3}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="new-reminder-date">Data</Label>
-                          <Input
-                            id="new-reminder-date"
-                            type="date"
-                            value={newReminderDate ? newReminderDate.toISOString().split('T')[0] : ''}
-                            onChange={(e) =>
-                              setNewReminderDate(
-                                e.target.value ? new Date(`${e.target.value}T12:00:00`) : null,
-                              )
-                            }
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Essa data aparecerá marcada no calendário.
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="new-reminder-color">Cor</Label>
-                          <Select
-                            value={newReminderColor}
-                            onValueChange={(value: 'amber' | 'blue' | 'green' | 'red') =>
-                              setNewReminderColor(value)
-                            }
-                          >
-                            <SelectTrigger id="new-reminder-color">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="amber">Amarelo</SelectItem>
-                              <SelectItem value="blue">Azul</SelectItem>
-                              <SelectItem value="green">Roxo pastel</SelectItem>
-                              <SelectItem value="red">Vermelho</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsAddReminderOpen(false)}>
-                          Cancelar
-                        </Button>
-                        <Button onClick={handleAddReminder}>Adicionar</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {reminders.map((reminder) => (
-                    <div
-                      key={reminder.id}
-                      className={`group relative rounded-lg border p-3 ${getReminderColorClasses(
-                        reminder.color
-                      )}`}
-                    >
-                      <div className="space-y-1 pr-16">
-                        <p className={`text-sm ${getReminderTextColor(reminder.color)}`}>
-                          {reminder.text}
-                        </p>
-                        {reminder.remindAt && (
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(reminder.remindAt).toLocaleDateString('pt-BR')}
-                          </p>
-                        )}
-                      </div>
-                      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Dialog
-                          open={isReminderDialogOpen && editingReminder?.id === reminder.id}
-                          onOpenChange={(open) => {
-                            setIsReminderDialogOpen(open)
-                            if (!open) setEditingReminder(null)
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => {
-                                setEditingReminder(reminder)
-                                setIsReminderDialogOpen(true)
-                              }}
-                            >
-                              <Edit className="h-3 w-3" />
+                <CardTitle>Lembretes Rápidos</CardTitle>
+                <Dialog open={isAddReminderOpen} onOpenChange={setIsAddReminderOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Plus className="h-4 w-4" /> Novo Lembrete
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Novo Lembrete</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Textarea
+                        value={newReminderText}
+                        onChange={(e) => setNewReminderText(e.target.value)}
+                        placeholder="Escreva seu lembrete aqui..."
+                        rows={3}
+                      />
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="gap-2">
+                              <CalendarIcon className="h-4 w-4" />
+                              {newReminderDate ? newReminderDate.toLocaleDateString('pt-BR') : 'Data'}
                             </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Editar Lembrete</DialogTitle>
-                            </DialogHeader>
-                            {editingReminder && (
-                              <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-reminder-text">Texto</Label>
-                                  <Textarea
-                                    id="edit-reminder-text"
-                                    value={editingReminder.text}
-                                    onChange={(e) =>
-                                      setEditingReminder({
-                                        ...editingReminder,
-                                        text: e.target.value,
-                                      })
-                                    }
-                                    rows={3}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-reminder-date">Data</Label>
-                                  <Input
-                                    id="edit-reminder-date"
-                                    type="date"
-                                    value={
-                                      editingReminder.remindAt
-                                        ? new Date(editingReminder.remindAt).toISOString().split('T')[0]
-                                        : ''
-                                    }
-                                    onChange={(e) =>
-                                      setEditingReminder({
-                                        ...editingReminder,
-                                        remindAt: e.target.value
-                                          ? new Date(`${e.target.value}T12:00:00`)
-                                          : null,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="edit-reminder-color">Cor</Label>
-                                  <Select
-                                    value={editingReminder.color}
-                                    onValueChange={(value: 'amber' | 'blue' | 'green' | 'red') =>
-                                      setEditingReminder({
-                                        ...editingReminder,
-                                        color: value,
-                                      })
-                                    }
-                                  >
-                                    <SelectTrigger id="edit-reminder-color">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="amber">Amarelo</SelectItem>
-                                      <SelectItem value="blue">Azul</SelectItem>
-                                      <SelectItem value="green">Roxo pastel</SelectItem>
-                                      <SelectItem value="red">Vermelho</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-                            )}
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsReminderDialogOpen(false)}
-                              >
-                                Cancelar
-                              </Button>
-                              <Button onClick={handleSaveReminder}>Salvar</Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleDeleteReminder(reminder.id)}
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={newReminderDate ?? undefined}
+                              onSelect={(date) => setNewReminderDate(date ?? null)}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <Select
+                          value={newReminderColor}
+                          onValueChange={(value: Reminder['color']) => setNewReminderColor(value)}
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="blue">Azul</SelectItem>
+                            <SelectItem value="green">Verde</SelectItem>
+                            <SelectItem value="amber">Amarelo</SelectItem>
+                            <SelectItem value="red">Vermelho</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAddReminderOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleAddReminder}>Adicionar</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {reminders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum lembrete.</p>
+                ) : (
+                  reminders.map((reminder) => (
+                    <div
+                      key={reminder.id}
+                      className={`rounded-md border p-3 ${getReminderColorClasses(reminder.color)}`}
+                    >
+                      <p className={`text-sm ${getReminderTextColor(reminder.color)}`}>{reminder.text}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          {reminder.remindAt
+                            ? `Lembrar em: ${reminder.remindAt.toLocaleDateString('pt-BR')}`
+                            : ''}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setEditingReminder(reminder)
+                              setIsReminderDialogOpen(true)
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleDeleteReminder(reminder.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
+
           </div>
         </div>
       </div>
-
-      {/* Patient Profile Dialog */}
-      <Dialog
-        open={isPatientProfileOpen}
-        onOpenChange={(open) => {
-          setIsPatientProfileOpen(open)
-          if (!open) {
-            setEditingField(null)
-            setEditingValue('')
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <Dialog open={isReminderDialogOpen} onOpenChange={setIsReminderDialogOpen}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Perfil do Paciente</DialogTitle>
-            <DialogDescription>
-              Informações completas e prontuários
-            </DialogDescription>
+            <DialogTitle>Editar Lembrete</DialogTitle>
           </DialogHeader>
-          {viewingPatient && (
-            <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-                <TabsTrigger value="records">Prontuários</TabsTrigger>
-                <TabsTrigger value="contact">Contato</TabsTrigger>
-              </TabsList>
-
-              <ScrollArea className="flex-1 mt-4">
-                <TabsContent value="overview" className="space-y-4 mt-0">
-                  <div className="rounded-lg border border-border/50 p-6">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                        <User className="h-8 w-8 text-primary" />
-                      </div>
-                      <div className="flex-1 space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {editingField === 'name' ? (
-                            <Input
-                              autoFocus
-                              value={editingValue}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onKeyDown={handleFieldInputKeyDown}
-                              className="h-10 max-w-sm"
-                              placeholder="Nome do paciente"
-                            />
-                          ) : (
-                            <>
-                              <h2 className="text-2xl font-semibold text-foreground">
-                                {viewingPatient.name}
-                              </h2>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleStartEditingField('name', viewingPatient.name)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-foreground">Idade:</span>
-                            {editingField === 'basicInfo.age' ? (
-                              <Input
-                                autoFocus
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onKeyDown={handleFieldInputKeyDown}
-                                className="h-8 max-w-[160px]"
-                                placeholder="Ex: 32 anos"
-                              />
-                            ) : (
-                              <span>{viewingPatient.basicInfo.age ?? 'Adicionar idade'}</span>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                handleStartEditingField('basicInfo.age', viewingPatient.basicInfo.age)
-                              }
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-foreground">Profissão:</span>
-                            {editingField === 'basicInfo.occupation' ? (
-                              <Input
-                                autoFocus
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onKeyDown={handleFieldInputKeyDown}
-                                className="h-8 max-w-xs"
-                                placeholder="Ex: Engenheiro"
-                              />
-                            ) : (
-                              <span>
-                                {viewingPatient.basicInfo.occupation ?? 'Adicionar profissão'}
-                              </span>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                handleStartEditingField(
-                                  'basicInfo.occupation',
-                                  viewingPatient.basicInfo.occupation
-                                )
-                              }
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator className="my-6" />
-
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="rounded-lg bg-muted/50 p-4">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <TrendingUp className="h-4 w-4" />
-                          <span className="text-xs">Total de Consultas</span>
-                        </div>
-                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                          {viewingPatient.totalAppointments}
-                        </p>
-                      </div>
-
-                      <div className="rounded-lg bg-[#f2e9ff] p-4">
-                        <div className="flex items-center gap-2 text-[#4c1e70]">
-                          <Check className="h-4 w-4" />
-                          <span className="text-xs">Concluídas</span>
-                        </div>
-                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                          {viewingPatient.completedAppointments}
-                        </p>
-                      </div>
-
-                      <div className="rounded-lg bg-amber-500/10 p-4">
-                        <div className="flex items-center gap-2 text-amber-700">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-xs">Agendadas</span>
-                        </div>
-                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                          {viewingPatient.upcomingAppointments}
-                        </p>
-                      </div>
-                    </div>
-
-                    {viewingPatient.basicInfo.emergencyContact && (
-                      <>
-                        <Separator className="my-6" />
-                        <div>
-                          <h3 className="text-sm font-medium text-foreground mb-2">
-                            Contato de Emergência
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {viewingPatient.basicInfo.emergencyContact}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="records" className="space-y-4 mt-0">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-foreground">
-                        Prontuários ({viewingPatient.medicalRecords.length})
-                      </h3>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                            <Plus className="h-4 w-4" />
-                            Novo Prontuário
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Adicionar Prontuário</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="record-title">Título</Label>
-                              <Input
-                                id="record-title"
-                                value={newRecordTitle}
-                                onChange={(e) => setNewRecordTitle(e.target.value)}
-                                placeholder="Ex: Consulta de acompanhamento"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="record-tags">Tags</Label>
-                              <Input
-                                id="record-tags"
-                                value={newRecordTags}
-                                onChange={(e) => setNewRecordTags(e.target.value)}
-                                placeholder="ansiedade, sono, evolução"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="record-content">Conteúdo</Label>
-                              <Textarea
-                                id="record-content"
-                                value={newRecordContent}
-                                onChange={(e) => setNewRecordContent(e.target.value)}
-                                placeholder="Observações da consulta, evolução, tratamento..."
-                                rows={6}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => {
-                              setNewRecordTitle('')
-                              setNewRecordContent('')
-                              setNewRecordTags('')
-                            }}>
-                              Cancelar
-                            </Button>
-                            <Button onClick={handleAddMedicalRecord}>Salvar</Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-
-                    {viewingPatient.medicalRecords.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border/50 p-8 text-center">
-                        <Stethoscope className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                        <p className="mt-4 text-sm text-muted-foreground">
-                          Nenhum prontuário registrado ainda
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {viewingPatient.medicalRecords
-                          .sort((a, b) => b.date.getTime() - a.date.getTime())
-                          .map((record) => (
-                            <div
-                              key={record.id}
-                              className="rounded-lg border border-border/50 bg-card p-4"
-                            >
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-foreground">{record.title}</h4>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {record.date.toLocaleDateString('pt-BR', {
-                                      day: '2-digit',
-                                      month: 'long',
-                                      year: 'numeric',
-                                    })}
-                                  </p>
-                                  <p className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap">
-                                    {record.content}
-                                  </p>
-                                  {record.tags.length > 0 && (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                      {record.tags.map((tag) => (
-                                        <Badge key={`${record.id}-${tag}`} variant="secondary">
-                                          <Tag className="mr-1 h-3 w-3" />
-                                          {tag}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleStartEditMedicalRecord(record)}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-red-600 hover:text-red-700"
-                                    onClick={() => handleDeleteMedicalRecord(record.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="contact" className="space-y-4 mt-0">
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-border/50 p-6">
-                      <h3 className="text-sm font-medium text-foreground mb-4">
-                        Informações de Contato
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-3">
-                          <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">Email</p>
-                            {editingField === 'email' ? (
-                              <Input
-                                autoFocus
-                                className="mt-1"
-                                type="email"
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onKeyDown={handleFieldInputKeyDown}
-                                placeholder="email@exemplo.com"
-                              />
-                            ) : (
-                              <div className="mt-1 flex items-center gap-2">
-                                <p className="text-sm text-foreground">
-                                  {viewingPatient.email || 'Adicionar email'}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleStartEditingField('email', viewingPatient.email)}
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-3">
-                          <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">Telefone</p>
-                            {editingField === 'phone' ? (
-                              <Input
-                                autoFocus
-                                className="mt-1"
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onKeyDown={handleFieldInputKeyDown}
-                                placeholder="+55 11 99999-9999"
-                              />
-                            ) : (
-                              <div className="mt-1 flex items-center gap-2">
-                                <p className="text-sm text-foreground">
-                                  {viewingPatient.phone || 'Adicionar telefone'}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleStartEditingField('phone', viewingPatient.phone)}
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Separator />
-                        <div className="flex items-start gap-3">
-                          <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1 space-y-1">
-                            <p className="text-xs text-muted-foreground">Contato de Emergência</p>
-                            {editingField === 'basicInfo.emergencyContact' ? (
-                              <Input
-                                autoFocus
-                                className="mt-1"
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onKeyDown={handleFieldInputKeyDown}
-                                placeholder="(11) 99999-9999 - Nome do contato"
-                              />
-                            ) : (
-                              <div className="mt-1 flex items-center gap-2">
-                                <p className="text-sm text-foreground">
-                                  {viewingPatient.basicInfo.emergencyContact ||
-                                    'Adicionar contato de emergência'}
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    handleStartEditingField(
-                                      'basicInfo.emergencyContact',
-                                      viewingPatient.basicInfo.emergencyContact
-                                    )
-                                  }
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              Usado somente em situações emergenciais.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </ScrollArea>
-            </Tabs>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={isEditRecordDialogOpen}
-        onOpenChange={(open) => {
-          setIsEditRecordDialogOpen(open)
-          if (!open) {
-            setEditingRecord(null)
-          }
-        }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Editar Prontuário</DialogTitle>
-          </DialogHeader>
-          {editingRecord && (
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="edit-record-title">Título</Label>
-                <Input
-                  id="edit-record-title"
-                  value={editingRecord.title}
-                  onChange={(e) =>
-                    setEditingRecord({
-                      ...editingRecord,
-                      title: e.target.value,
-                    })
+          {editingReminder && (
+            <div className="py-4 space-y-4">
+              <Textarea
+                value={editingReminder.text}
+                onChange={(e) =>
+                  setEditingReminder({ ...editingReminder, text: e.target.value })
+                }
+                rows={4}
+              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      {editingReminder.remindAt
+                        ? editingReminder.remindAt.toLocaleDateString('pt-BR')
+                        : 'Data'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={editingReminder.remindAt ?? undefined}
+                      onSelect={(date) =>
+                        setEditingReminder({ ...editingReminder, remindAt: date ?? null })
+                      }
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Select
+                  value={editingReminder.color}
+                  onValueChange={(value: Reminder['color']) =>
+                    setEditingReminder({ ...editingReminder, color: value })
                   }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-record-date">Data</Label>
-                <Input
-                  id="edit-record-date"
-                  type="date"
-                  value={editingRecord.date.toISOString().split('T')[0]}
-                  onChange={(e) =>
-                    setEditingRecord({
-                      ...editingRecord,
-                      date: e.target.value ? new Date(e.target.value) : editingRecord.date,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-record-tags">Tags</Label>
-                <Input
-                  id="edit-record-tags"
-                  value={editingRecord.tags.join(', ')}
-                  onChange={(e) =>
-                    setEditingRecord({
-                      ...editingRecord,
-                      tags: parseTags(e.target.value),
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-record-content">Conteúdo</Label>
-                <Textarea
-                  id="edit-record-content"
-                  value={editingRecord.content}
-                  onChange={(e) =>
-                    setEditingRecord({
-                      ...editingRecord,
-                      content: e.target.value,
-                    })
-                  }
-                  rows={6}
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="blue">Azul</SelectItem>
+                    <SelectItem value="green">Verde</SelectItem>
+                    <SelectItem value="amber">Amarelo</SelectItem>
+                    <SelectItem value="red">Vermelho</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsEditRecordDialogOpen(false)
-                setEditingRecord(null)
-              }}
-            >
+            <Button variant="outline" onClick={() => setIsReminderDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button type="button" onClick={handleSaveEditedMedicalRecord}>
-              Salvar alterações
-            </Button>
+            <Button onClick={handleSaveReminder}>Salvar</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPatientProfileOpen} onOpenChange={setIsPatientProfileOpen}>
+        <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-4xl">
+          {viewingPatient && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Perfil do Paciente</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-6">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                    <User className="w-10 h-10 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <EditableField
+                      fieldId="name"
+                      label="Nome"
+                      value={viewingPatient.name}
+                      onSave={handleSaveEditingField}
+                    />
+                    <EditableField
+                      fieldId="email"
+                      label="Email"
+                      value={viewingPatient.email}
+                      onSave={handleSaveEditingField}
+                    />
+                     <EditableField
+                      fieldId="phone"
+                      label="Telefone"
+                      value={viewingPatient.phone}
+                      onSave={handleSaveEditingField}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                  <StatCard title="Consultas Totais" value={viewingPatient.totalAppointments} />
+                  <StatCard title="Concluídas" value={viewingPatient.completedAppointments} />
+                  <StatCard title="Próximas" value={viewingPatient.upcomingAppointments} />
+                   <StatCard title="Faltas" value={0} />
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   )
+}
+
+function EditableField({ fieldId, label, value, onSave }: { fieldId: string, label: string, value: string, onSave: () => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentValue, setCurrentValue] = useState(value);
+
+  const handleSave = () => {
+    // onSave(fieldId, currentValue);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-sm text-muted-foreground">{label}</Label>
+      {isEditing ? (
+        <div className="flex items-center gap-2">
+          <Input
+            value={currentValue}
+            onChange={(e) => setCurrentValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            autoFocus
+          />
+          <Button size="icon" onClick={handleSave}><Check className="h-4 w-4" /></Button>
+          <Button size="icon" variant="ghost" onClick={() => setIsEditing(false)}><X className="h-4 w-4" /></Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <p className="text-lg font-medium text-foreground">{value || 'Não informado'}</p>
+          <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ title, value }: { title: string, value: number }) {
+  return (
+    <div className="bg-muted/50 p-4 rounded-lg">
+      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="text-2xl font-bold text-foreground">{value}</p>
+    </div>
+  );
 }

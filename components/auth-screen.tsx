@@ -4,10 +4,11 @@ import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/ui/animated-tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Brain } from 'lucide-react'
+import { Brain, CheckCircle2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PsychologistProfile } from '@/lib/psychologists'
 import { appConfig } from '@/lib/app-config'
@@ -22,10 +23,8 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
   const searchParams = useSearchParams()
   const [isReady, setIsReady] = useState(false)
   const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
   const [isPsychologistDialogOpen, setIsPsychologistDialogOpen] = useState(false)
   const [psychologistDialogMode, setPsychologistDialogMode] = useState<'login' | 'request'>(
     'login',
@@ -40,6 +39,10 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
   const [psychologistRequestSuccess, setPsychologistRequestSuccess] = useState('')
   const [isPsychologistRequesting, setIsPsychologistRequesting] = useState(false)
   const [hasAutoOpenedDialog, setHasAutoOpenedDialog] = useState(false)
+  const [psychologistLoginEmailValid, setPsychologistLoginEmailValid] = useState(false)
+  const [psychologistLoginPinValid, setPsychologistLoginPinValid] = useState(false)
+  const [psychologistRequestNameValid, setPsychologistRequestNameValid] = useState(false)
+  const [psychologistRequestEmailValid, setPsychologistRequestEmailValid] = useState(false)
 
   const resetPsychologistForms = () => {
     setPsychologistDialogMode('login')
@@ -200,7 +203,7 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl text-foreground">Bem-vindo</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Entre na sua conta ou crie uma nova
+              Continue com seus dados para acessar sua área
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -224,20 +227,8 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                       className="bg-input"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Senha</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="Digite sua senha"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                      className="bg-input"
-                    />
-                  </div>
                   <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                    Entrar
+                    Continuar
                   </Button>
                   <div className="text-center">
                     <button
@@ -277,20 +268,8 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
                       className="bg-input"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Senha</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Crie uma senha"
-                      value={signupPassword}
-                      onChange={(e) => setSignupPassword(e.target.value)}
-                      required
-                      className="bg-input"
-                    />
-                  </div>
                   <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                    Cadastrar
+                    Criar acesso
                   </Button>
                   <div className="text-center text-xs text-muted-foreground">
                     Psicólogo ou psicóloga?
@@ -313,119 +292,148 @@ export function AuthScreen({ onLogin, onPsychologistLogin }: AuthScreenProps) {
         </p>
       </div>
       <Dialog open={isPsychologistDialogOpen} onOpenChange={handlePsychologistDialogChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Área do Psicólogo</DialogTitle>
-            <DialogDescription>
-              Solicite acesso ou entre com o PIN enviado pela equipe {appConfig.name}.
-            </DialogDescription>
-          </DialogHeader>
-          <Tabs
-            value={psychologistDialogMode}
-            onValueChange={handlePsychologistTabChange}
-            className="w-full pt-2"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Já tenho convite</TabsTrigger>
-              <TabsTrigger value="request">Solicitar acesso</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login" className="space-y-5 pt-4">
-              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                Use o email profissional e o PIN recebido para entrar.
-              </div>
-              <form onSubmit={handlePsychologistLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="psychologist-login-email">Email profissional</Label>
-                  <Input
-                    id="psychologist-login-email"
-                    type="email"
-                    placeholder="psicologo@seudominio.com"
-                    value={psychologistLoginEmail}
-                    onChange={(e) => setPsychologistLoginEmail(e.target.value)}
-                    required
-                    className="bg-input"
-                  />
+        <DialogContent className="max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="hidden min-h-[320px] md:flex md:flex-col md:justify-center md:p-10 bg-gradient-to-br from-primary to-teal-400 text-primary-foreground">
+              <h2 className="text-3xl font-serif mb-4">"A jornada de mil milhas começa com um único passo."</h2>
+              <p className="text-lg opacity-80">- Lao Tzu</p>
+            </div>
+            <div className="p-5 sm:p-8 md:p-10">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">Área do Psicólogo</DialogTitle>
+                <DialogDescription>
+                  Solicite acesso ou entre com o PIN enviado pela equipe {appConfig.name}.
+                </DialogDescription>
+              </DialogHeader>
+              <AnimatedTabs
+                tabs={[
+                  { label: 'Já tenho convite', value: 'login' },
+                  { label: 'Solicitar acesso', value: 'request' },
+                ]}
+                activeTab={psychologistDialogMode}
+                onTabChange={handlePsychologistTabChange}
+              />
+              {psychologistDialogMode === 'login' && <div className="space-y-5 pt-4">
+                <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                  Use o email profissional e o PIN recebido para entrar.
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="psychologist-login-pin">PIN de acesso (6 dígitos)</Label>
-                  <Input
-                    id="psychologist-login-pin"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    placeholder="Ex: 123456"
-                    value={psychologistLoginPin}
-                    onChange={(e) =>
-                      setPsychologistLoginPin(e.target.value.replace(/[^0-9]/g, ''))
-                    }
-                    required
-                    className="bg-input tracking-[0.3em]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    O PIN é definido por você no link de cadastro enviado pela equipe {appConfig.name}.
-                  </p>
+                <form onSubmit={handlePsychologistLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="psychologist-login-email">Email profissional</Label>
+                    <div className="relative">
+                      <Input
+                        id="psychologist-login-email"
+                        type="email"
+                        placeholder="psicologo@seudominio.com"
+                        value={psychologistLoginEmail}
+                        onChange={(e) => {
+                          setPsychologistLoginEmail(e.target.value)
+                          setPsychologistLoginEmailValid(/^[^@]+@[^@]+\.[^@]+$/.test(e.target.value))
+                        }}
+                        required
+                        className="bg-input"
+                      />
+                      {psychologistLoginEmailValid && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="psychologist-login-pin">PIN de acesso (6 dígitos)</Label>
+                    <div className="relative">
+                      <Input
+                        id="psychologist-login-pin"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        placeholder="Ex: 123456"
+                        value={psychologistLoginPin}
+                        onChange={(e) => {
+                          const pin = e.target.value.replace(/[^0-9]/g, '')
+                          setPsychologistLoginPin(pin)
+                          setPsychologistLoginPinValid(pin.length === 6)
+                        }}
+                        required
+                        className="bg-input tracking-[0.3em]"
+                      />
+                      {psychologistLoginPinValid && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O PIN é definido por você no link de cadastro enviado pela equipe {appConfig.name}.
+                    </p>
+                  </div>
+                  {psychologistLoginError && (
+                    <p className="text-sm text-destructive">{psychologistLoginError}</p>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={isPsychologistSubmitting}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isPsychologistSubmitting ? 'Validando...' : 'Entrar na área profissional'}
+                  </Button>
+                </form>
+              </div>}
+              {psychologistDialogMode === 'request' && <div className="space-y-5 pt-4">
+                <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+                  Envie seus dados para aprovação da equipe administrativa.
                 </div>
-                {psychologistLoginError && (
-                  <p className="text-sm text-destructive">{psychologistLoginError}</p>
-                )}
-                <Button
-                  type="submit"
-                  disabled={isPsychologistSubmitting}
-                  className="w-full bg-[#c7a4ff] text-[#301144] hover:bg-[#b78bf7]"
-                >
-                  {isPsychologistSubmitting ? 'Validando...' : 'Entrar na área profissional'}
-                </Button>
-              </form>
-            </TabsContent>
-            <TabsContent value="request" className="space-y-5 pt-4">
-              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-                Envie seus dados para aprovação da equipe administrativa.
-              </div>
-              <form onSubmit={handlePsychologistRequest} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="psychologist-request-name">Nome completo</Label>
-                  <Input
-                    id="psychologist-request-name"
-                    type="text"
-                    placeholder="Seu nome completo"
-                    value={psychologistRequestName}
-                    onChange={(e) => setPsychologistRequestName(e.target.value)}
-                    required
-                    className="bg-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="psychologist-request-email">Email profissional</Label>
-                  <Input
-                    id="psychologist-request-email"
-                    type="email"
-                    placeholder="psicologo@seudominio.com"
-                    value={psychologistRequestEmail}
-                    onChange={(e) => setPsychologistRequestEmail(e.target.value)}
-                    required
-                    className="bg-input"
-                  />
-                </div>
-                {psychologistRequestError && (
-                  <p className="text-sm text-destructive">{psychologistRequestError}</p>
-                )}
-                {psychologistRequestSuccess && (
-                  <p className="text-sm text-emerald-600">{psychologistRequestSuccess}</p>
-                )}
-                <Button
-                  type="submit"
-                  disabled={isPsychologistRequesting}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  {isPsychologistRequesting ? 'Enviando...' : 'Enviar solicitação'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-          <p className="text-xs text-muted-foreground text-center">
-            Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da {appConfig.name}.
-          </p>
+                <form onSubmit={handlePsychologistRequest} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="psychologist-request-name">Nome completo</Label>
+                    <div className="relative">
+                      <Input
+                        id="psychologist-request-name"
+                        type="text"
+                        placeholder="Seu nome completo"
+                        value={psychologistRequestName}
+                        onChange={(e) => {
+                          setPsychologistRequestName(e.target.value)
+                          setPsychologistRequestNameValid(e.target.value.trim().length > 0)
+                        }}
+                        required
+                        className="bg-input"
+                      />
+                      {psychologistRequestNameValid && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="psychologist-request-email">Email profissional</Label>
+                    <div className="relative">
+                      <Input
+                        id="psychologist-request-email"
+                        type="email"
+                        placeholder="psicologo@seudominio.com"
+                        value={psychologistRequestEmail}
+                        onChange={(e) => {
+                          setPsychologistRequestEmail(e.target.value)
+                          setPsychologistRequestEmailValid(/^[^@]+@[^@]+\.[^@]+$/.test(e.target.value))
+                        }}
+                        required
+                        className="bg-input"
+                      />
+                      {psychologistRequestEmailValid && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />}
+                    </div>
+                  </div>
+                  {psychologistRequestError && (
+                    <p className="text-sm text-destructive">{psychologistRequestError}</p>
+                  )}
+                  {psychologistRequestSuccess && (
+                    <p className="text-sm text-emerald-600">{psychologistRequestSuccess}</p>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={isPsychologistRequesting}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isPsychologistRequesting ? 'Enviando...' : 'Enviar solicitação'}
+                  </Button>
+                </form>
+              </div>}
+              <p className="pt-4 text-center text-xs text-muted-foreground">
+                Área administrativa disponível apenas via URL privada. Em caso de dúvidas, contate o suporte da {appConfig.name}.
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

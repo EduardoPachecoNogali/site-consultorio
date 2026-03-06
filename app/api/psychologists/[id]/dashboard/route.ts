@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requirePsychologistSession } from '@/lib/psychologist-auth'
 
 interface Params {
   params?: { id?: string } | Promise<{ id?: string }>
@@ -56,6 +57,11 @@ export async function GET(request: Request, { params }: Params) {
   const id = getIdFromRequest(request, resolvedParams)
   if (!id) {
     return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
+  }
+
+  const sessionPsychologist = await requirePsychologistSession(id)
+  if (!sessionPsychologist) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
   const psychologist = await prisma.psychologist.findUnique({

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createMeetLink } from '@/lib/google-meet'
+import { requirePatientSession } from '@/lib/patient-auth'
 
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
@@ -9,6 +9,11 @@ export async function GET(request: Request) {
   const email = normalizeString(new URL(request.url).searchParams.get('email') || '')
   if (!email) {
     return NextResponse.json({ error: 'Email inválido.' }, { status: 400 })
+  }
+
+  const hasSession = await requirePatientSession(email)
+  if (!hasSession) {
+    return NextResponse.json({ error: 'Sessão do paciente inválida.' }, { status: 401 })
   }
 
   const patient = await prisma.patient.findFirst({
@@ -36,45 +41,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Nenhuma consulta futura.' }, { status: 404 })
   }
 
-  let meetingUrl = appointment.meetingUrl ?? ''
-  if (!meetingUrl) {
-    if (!appointment.psychologist?.googleRefreshToken) {
-      return NextResponse.json(
-        { error: 'Google Calendar nao conectado pelo profissional.' },
-        { status: 409 },
-      )
-    }
-
-    const meetResult = await createMeetLink({
-      appointmentId: appointment.id,
-      patientEmail: patient.email || email,
-      date: appointment.date,
-      time: appointment.time,
-      duration: appointment.duration,
-      psychologistName: appointment.psychologist?.name,
-      patientName: appointment.patient.name,
-      google: {
-        refreshToken: appointment.psychologist?.googleRefreshToken,
-        calendarId: appointment.psychologist?.googleCalendarId,
-        psychologistEmail:
-          appointment.psychologist?.googleEmail || appointment.psychologist?.email,
-      },
-    })
-
-    if (!meetResult.ok) {
-      return NextResponse.json(
-        { error: meetResult.error || 'Erro ao criar reunião no Google Meet.' },
-        { status: 502 },
-      )
-    }
-
-    meetingUrl = meetResult.meetingUrl
-
-    await prisma.appointment.update({
-      where: { id: appointment.id },
-      data: { meetingUrl },
-    })
-  }
+  const meetingUrl = appointment.meetingUrl ?? ''
 
   return NextResponse.json({
     appointment: {

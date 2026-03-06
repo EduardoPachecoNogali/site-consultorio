@@ -66,6 +66,15 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
   const [groupRequestNote, setGroupRequestNote] = useState('')
   const [bookingError, setBookingError] = useState('')
   const [bookingSuccess, setBookingSuccess] = useState('')
+  const [step, setStep] = useState(1)
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!userEmail) return
@@ -229,9 +238,12 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
     }
   }
 
+  const [isBooking, setIsBooking] = useState(false);
+
   const handleBookAppointment = async () => {
     setBookingError('')
     setBookingSuccess('')
+    setIsBooking(true)
 
     if (!selectedPsychologistId) {
       setBookingError('Selecione um psicólogo para continuar.')
@@ -280,6 +292,8 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
       fetchAvailability(selectedPsychologistId, preferredPeriod)
     } catch (error: any) {
       setBookingError(error.message || 'Não foi possível agendar a consulta.')
+    } finally {
+      setIsBooking(false)
     }
   }
   const pastAppointments: { date: string; doctor: string; duration: string }[] = []
@@ -321,19 +335,17 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
         {...props}
         className={cn(
           className,
-          isSelectedSlot &&
-            'bg-emerald-500/20 text-emerald-900 ring-2 ring-emerald-500/40 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]',
-          'transition-colors',
+          'h-10 w-10 rounded-full transition-colors',
+          { 'bg-primary text-primary-foreground': isSelectedSlot },
         )}
       >
         <div className="flex flex-col items-center">
           <span>{dayNumber}</span>
           <span className="mt-1 flex items-center">
-            {hasAvailability && (
+            {hasAvailability && !isSelectedSlot && (
               <span
                 className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  isSelectedSlot ? 'bg-emerald-500' : 'bg-primary',
+                  'h-1.5 w-1.5 rounded-full bg-primary',
                 )}
               />
             )}
@@ -353,22 +365,19 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-card">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <Brain className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">{appConfig.name}</h1>
-              <p className="text-xs text-muted-foreground">Plataforma de Teleatendimento</p>
-            </div>
+      {/* New Header */}
+      <header className="bg-gradient-to-r from-primary to-teal-400 p-6 text-primary-foreground shadow-md">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-serif">Olá, {userName}</h1>
+            <p className="text-sm opacity-80">
+              Bem-vindo de volta. {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-muted-foreground hover:text-foreground"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary-foreground hover:bg-white/20"
             onClick={onLogout}
           >
             <LogOut className="h-5 w-5" />
@@ -378,20 +387,10 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-semibold text-foreground text-balance">
-            Olá, {userName}
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Bem-vindo de volta à sua jornada de bem-estar
-          </p>
-        </div>
-
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Next Appointment - Main Column */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="border-border/50 shadow-sm">
+            <Card className="animate-in slide-in-from-bottom-4 border-l-4 border-primary shadow-lg fade-in duration-500">
               <CardHeader>
               <CardTitle className="flex items-center gap-2 text-foreground">
                   <CalendarIcon className="h-5 w-5 text-primary" />
@@ -412,7 +411,7 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                   </div>
                 ) : nextAppointment ? (
                   <div className="space-y-3">
-                    <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4">
+                    <div className="flex flex-col gap-4 rounded-lg bg-muted/50 p-4 sm:flex-row sm:items-start">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                         <User className="h-6 w-6 text-primary" />
                       </div>
@@ -445,6 +444,7 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                           <Button
                             onClick={handleJoinCall}
                             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+                            disabled={!nextAppointment.meetingUrl}
                           >
                             <Video className="mr-2 h-4 w-4" />
                             Entrar na Chamada
@@ -464,6 +464,11 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                             Google Calendar
                           </Button>
                         </div>
+                        {!nextAppointment.meetingUrl && (
+                          <p className="text-xs text-muted-foreground">
+                            O link da chamada será liberado quando o profissional conectar o Google Calendar.
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -481,7 +486,7 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
               </CardContent>
             </Card>
 
-            <Card className="border-border/50 shadow-sm">
+            <Card className="border-l-4 border-accent shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <CalendarClock className="h-5 w-5 text-primary" />
@@ -492,6 +497,25 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>1</div>
+                    <span className="text-sm">Profissional</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>2</div>
+                    <span className="text-sm">Data/Hora</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${step === 3 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${step === 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>3</div>
+                    <span className="text-sm">Confirmação</span>
+                  </div>
+                </div>
+                <Separator/>
+
                 {(bookingError || bookingSuccess) && (
                   <div
                     className={cn(
@@ -510,200 +534,256 @@ export function PatientDashboard({ userName, userEmail, onJoinCall, onLogout }: 
                   </div>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="psychologist-select">Psicólogo</Label>
-                    <Select value={selectedPsychologistId} onValueChange={handleSelectPsychologist}>
-                      <SelectTrigger id="psychologist-select">
-                        <SelectValue placeholder="Escolha um profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {psychologists.map((psychologist) => (
-                          <SelectItem key={psychologist.id} value={psychologist.id}>
-                            {psychologist.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {isLoadingPsychologists && (
-                      <p className="text-xs text-muted-foreground">Carregando profissionais...</p>
-                    )}
-                    {psychologistError && (
-                      <p className="text-xs text-destructive">{psychologistError}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="patient-phone">Telefone</Label>
-                    <Input
-                      id="patient-phone"
-                      value={patientPhone}
-                      onChange={(e) => setPatientPhone(e.target.value)}
-                      placeholder="+55 11 99999-9999"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Esse número será sincronizado com o psicólogo.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reason">Motivo da consulta</Label>
-                  <Textarea
-                    id="reason"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Conte brevemente o que você gostaria de trabalhar na sessão."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Solicitar terapia em grupo</p>
-                      <p className="text-xs text-muted-foreground">
-                        O psicólogo irá montar e nomear o grupo após sua solicitação.
-                      </p>
-                    </div>
-                    <Switch checked={groupRequested} onCheckedChange={setGroupRequested} />
-                  </div>
-                  {groupRequested && (
-                    <div className="space-y-3">
+                {step === 1 && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="group-request-note">Observações da solicitação</Label>
-                        <Textarea
-                          id="group-request-note"
-                          value={groupRequestNote}
-                          onChange={(e) => setGroupRequestNote(e.target.value)}
-                          placeholder="Conte brevemente como deve ser o grupo, tema ou objetivo."
-                          rows={3}
+                        <Label htmlFor="psychologist-select">Psicólogo</Label>
+                        <Select value={selectedPsychologistId} onValueChange={handleSelectPsychologist}>
+                          <SelectTrigger id="psychologist-select">
+                            <SelectValue placeholder="Escolha um profissional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {psychologists.map((psychologist) => (
+                              <SelectItem key={psychologist.id} value={psychologist.id}>
+                                {psychologist.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {isLoadingPsychologists && (
+                          <p className="text-xs text-muted-foreground">Carregando profissionais...</p>
+                        )}
+                        {psychologistError && (
+                          <p className="text-xs text-destructive">{psychologistError}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="patient-phone">Telefone</Label>
+                        <Input
+                          id="patient-phone"
+                          value={patientPhone}
+                          onChange={(e) => setPatientPhone(e.target.value)}
+                          placeholder="+55 11 99999-9999"
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Esse número será sincronizado com o psicólogo.
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-                  <div className="rounded-lg border border-border/60 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-foreground">Horários disponíveis</p>
-                      <Select
-                        value={preferredPeriod}
-                        onValueChange={(value: 'morning' | 'afternoon' | 'evening' | 'none') =>
-                          setPreferredPeriod(value)
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-[140px]">
-                          <SelectValue placeholder="Preferência" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sem preferência</SelectItem>
-                          <SelectItem value="morning">Manhã</SelectItem>
-                          <SelectItem value="afternoon">Tarde</SelectItem>
-                          <SelectItem value="evening">Noite</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-2">
+                      <Label htmlFor="reason">Motivo da consulta</Label>
+                      <Textarea
+                        id="reason"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Conte brevemente o que você gostaria de trabalhar na sessão."
+                        rows={3}
+                      />
                     </div>
 
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => {
-                        if (!date) return
-                        const prevKey = selectedDate.toISOString().slice(0, 10)
-                        const nextKey = date.toISOString().slice(0, 10)
-                        setSelectedDate(date)
-                        if (prevKey !== nextKey) {
-                          setSelectedSlot(null)
-                        }
-                      }}
-                      modifiers={calendarModifiers}
-                      components={{ DayButton: CalendarDayContent }}
-                      className="rounded-md border-0"
-                    />
+                      <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Solicitar terapia em grupo</p>
+                          <p className="text-xs text-muted-foreground">
+                            O psicólogo irá montar e nomear o grupo após sua solicitação.
+                          </p>
+                        </div>
+                        <Switch checked={groupRequested} onCheckedChange={setGroupRequested} />
+                      </div>
+                      {groupRequested && (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="group-request-note">Observações da solicitação</Label>
+                            <Textarea
+                              id="group-request-note"
+                              value={groupRequestNote}
+                              onChange={(e) => setGroupRequestNote(e.target.value)}
+                              placeholder="Conte brevemente como deve ser o grupo, tema ou objetivo."
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <Button onClick={() => setStep(2)} className="w-full sm:w-auto" disabled={!selectedPsychologistId}>
+                      Próximo
+                    </Button>
+                  </>
+                )}
 
-                    {!selectedPsychologistId && (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Selecione um profissional para carregar horários disponíveis.
-                      </p>
-                    )}
-                    {isLoadingSlots && (
-                      <p className="mt-3 text-xs text-muted-foreground">Carregando horários...</p>
-                    )}
-                    {slotsError && (
-                      <p className="mt-3 text-xs text-destructive">{slotsError}</p>
-                    )}
-                  </div>
+                {step === 2 && (
+                  <>
+                    <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
+                        <div className="rounded-lg border border-border/60 p-4">
+                        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm font-medium text-foreground">Horários disponíveis</p>
+                          <Select
+                            value={preferredPeriod}
+                            onValueChange={(value: 'morning' | 'afternoon' | 'evening' | 'none') =>
+                              setPreferredPeriod(value)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-full sm:w-[140px]">
+                              <SelectValue placeholder="Preferência" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sem preferência</SelectItem>
+                              <SelectItem value="morning">Manhã</SelectItem>
+                              <SelectItem value="afternoon">Tarde</SelectItem>
+                              <SelectItem value="evening">Noite</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-border/60 p-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Horários do dia</p>
-                      {slotsForSelectedDate.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          Nenhum horário disponível para esta data.
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {slotsForSelectedDate.map((slot) => (
-                            <Button
-                              key={`${slot.date}-${slot.time}`}
-                              type="button"
-                              variant={
-                                selectedSlot?.date === slot.date && selectedSlot?.time === slot.time
-                                  ? 'default'
-                                  : 'outline'
-                              }
-                              size="sm"
-                              onClick={() => setSelectedSlot(slot)}
-                            >
-                              {slot.time}
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => {
+                            if (!date) return
+                            const prevKey = selectedDate.toISOString().slice(0, 10)
+                            const nextKey = date.toISOString().slice(0, 10)
+                            setSelectedDate(date)
+                            if (prevKey !== nextKey) {
+                              setSelectedSlot(null)
+                            }
+                          }}
+                          modifiers={calendarModifiers}
+                          components={{ DayButton: CalendarDayContent }}
+                          className="rounded-md border-0"
+                        />
+
+                        {!selectedPsychologistId && (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            Selecione um profissional para carregar horários disponíveis.
+                          </p>
+                        )}
+                        {isLoadingSlots && (
+                          <p className="mt-3 text-xs text-muted-foreground">Carregando horários...</p>
+                        )}
+                        {slotsError && (
+                          <p className="mt-3 text-xs text-destructive">{slotsError}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="rounded-lg border border-border/60 p-4">
+                          <p className="text-sm font-medium text-foreground mb-2">Horários do dia</p>
+                          {slotsForSelectedDate.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Nenhum horário disponível para esta data.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {slotsForSelectedDate.map((slot) => (
+                                <Button
+                                  key={`${slot.date}-${slot.time}`}
+                                  type="button"
+                                  variant={
+                                    selectedSlot?.date === slot.date && selectedSlot?.time === slot.time
+                                      ? 'default'
+                                      : 'outline'
+                                  }
+                                  size="sm"
+                                  onClick={() => setSelectedSlot(slot)}
+                                >
+                                  {slot.time}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 p-4">
+                          <p className="text-sm font-medium text-foreground mb-2">Sugestões inteligentes</p>
+                          {suggestedSlots.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Selecione um profissional para ver sugestões.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {suggestedSlots.map((slot) => (
+                                <button
+                                  key={`suggest-${slot.date}-${slot.time}`}
+                                  type="button"
+                                  className="flex w-full items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm hover:bg-muted/50"
+                                  onClick={() => {
+                                    setSelectedSlot(slot)
+                                    setSelectedDate(new Date(`${slot.date}T12:00:00`))
+                                  }}
+                                >
+                                  <span>
+                                    {new Date(`${slot.date}T12:00:00`).toLocaleDateString('pt-BR')}
+                                  </span>
+                                  <span className="font-medium text-foreground">{slot.time}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <Button onClick={() => setStep(1)} variant="outline">
+                        Voltar
+                      </Button>
+                      <Button onClick={() => setStep(3)} className="w-full sm:w-auto" disabled={!selectedSlot}>
+                        Próximo
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {step === 3 && (
+                    <>
+                      <div className="space-y-4">
+                          <div>
+                            <h3 className="text-lg font-medium text-foreground">Resumo do Agendamento</h3>
+                            <p className="text-sm text-muted-foreground">Confirme os detalhes da sua consulta.</p>
+                          </div>
+                          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-4">
+                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className="text-muted-foreground">Profissional</span>
+                                  <span className="font-semibold text-foreground">{psychologists.find(p => p.id === selectedPsychologistId)?.name}</span>
+                              </div>
+                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className="text-muted-foreground">Data</span>
+                                  <span className="font-semibold text-foreground">{selectedSlot ? new Date(`${selectedSlot.date}T12:00:00`).toLocaleDateString('pt-BR') : ''}</span>
+                              </div>
+                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className="text-muted-foreground">Horário</span>
+                                  <span className="font-semibold text-foreground">{selectedSlot?.time}</span>
+                              </div>
+                          </div>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <Button onClick={() => setStep(2)} variant="outline">
+                              Voltar
                             </Button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 p-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Sugestões inteligentes</p>
-                      {suggestedSlots.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          Selecione um profissional para ver sugestões.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {suggestedSlots.map((slot) => (
-                            <button
-                              key={`suggest-${slot.date}-${slot.time}`}
-                              type="button"
-                              className="flex w-full items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm hover:bg-muted/50"
-                              onClick={() => {
-                                setSelectedSlot(slot)
-                                setSelectedDate(new Date(`${slot.date}T12:00:00`))
-                              }}
-                            >
-                              <span>
-                                {new Date(`${slot.date}T12:00:00`).toLocaleDateString('pt-BR')}
-                              </span>
-                              <span className="font-medium text-foreground">{slot.time}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Button onClick={handleBookAppointment} className="w-full sm:w-auto">
-                  Agendar consulta
-                </Button>
+                            <Button onClick={handleBookAppointment} className="w-full" disabled={isBooking}>
+                                              {isBooking ? (
+                                                <>
+                                                  <span className="animate-spin mr-2 h-4 w-4" />
+                                                  Agendando...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <CalendarClock className="mr-2 h-4 w-4" />
+                                                  Agendar consulta
+                                                </>
+                                              )}
+                                            </Button>                        </div>
+                      </div>
+                    </>
+                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Sidebar - Past Appointments */}
           <div className="lg:col-span-1">
-            <Card className="border-border/50 shadow-sm">
+            <Card className="border-l-4 border-secondary shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
               <CardHeader>
                 <CardTitle className="text-foreground">Consultas Anteriores</CardTitle>
                 <CardDescription className="text-muted-foreground">

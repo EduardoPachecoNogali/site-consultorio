@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createAdminSession } from '@/lib/admin-auth'
+import { hashSecret, isHashedSecret, verifySecret } from '@/lib/secret-crypto'
 
 export async function POST(request: Request) {
   const { email, password } = await request.json()
@@ -22,11 +23,21 @@ export async function POST(request: Request) {
     )
   }
 
-  if (admin.password !== String(password)) {
+  const providedPassword = String(password)
+  const isValidPassword = await verifySecret(providedPassword, admin.password)
+
+  if (!isValidPassword) {
     return NextResponse.json(
       { error: 'Credenciais inválidas.' },
       { status: 401 },
     )
+  }
+
+  if (!isHashedSecret(admin.password)) {
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { password: await hashSecret(providedPassword) },
+    })
   }
 
   await createAdminSession(admin.id)

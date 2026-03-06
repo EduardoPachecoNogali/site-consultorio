@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { appConfig } from '@/lib/app-config'
 import { encryptRefreshToken } from '@/lib/token-crypto'
+import { parseGoogleOAuthState } from '@/lib/psychologist-auth'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo'
@@ -33,15 +34,6 @@ const renderHtml = (title: string, message: string) => `<!doctype html>
 </body>
 </html>`
 
-const parseState = (state: string) => {
-  try {
-    const json = Buffer.from(state, 'base64url').toString('utf8')
-    return JSON.parse(json) as { psychologistId?: string }
-  } catch {
-    return {}
-  }
-}
-
 const fetchGoogleEmail = async (accessToken: string) => {
   const response = await fetch(USERINFO_URL, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -69,7 +61,8 @@ export async function GET(request: Request) {
     })
   }
 
-  const { psychologistId } = parseState(state)
+  const statePayload = parseGoogleOAuthState(state)
+  const psychologistId = statePayload?.psychologistId
   if (!psychologistId) {
     return new NextResponse(renderHtml('Conexao invalida', 'Identificador do profissional nao encontrado.'), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },

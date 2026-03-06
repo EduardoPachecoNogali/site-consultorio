@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { serializePsychologist } from '@/lib/psychologists'
+import { hashSecret } from '@/lib/secret-crypto'
 
 const isExpired = (date: Date | null) => (date ? date.getTime() < Date.now() : true)
 
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     where: { id: psychologist.id },
     data: {
       name: String(name || psychologist.name).trim() || psychologist.name,
-      pin: String(pin),
+      pin: await hashSecret(String(pin)),
       status: 'approved',
       inviteToken: null,
       inviteExpiresAt: null,

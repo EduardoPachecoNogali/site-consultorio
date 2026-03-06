@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveRouteParams } from '@/lib/route-params'
 import { createMeetLink } from '@/lib/google-meet'
+import { requirePsychologistSession } from '@/lib/psychologist-auth'
 
 interface Params {
   params?: { id?: string } | Promise<{ id?: string }>
@@ -9,6 +10,8 @@ interface Params {
 
 const normalizeString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 const normalizeDate = (value: string) => {
   const parsed = new Date(value)
@@ -46,7 +49,9 @@ export async function POST(request: Request, { params }: Params) {
   const duration = normalizeString(payload.duration) || '50 min'
   const notes = normalizeString(payload.notes)
   const reason = normalizeString(payload.reason)
-  const createdBy = normalizeString(payload.createdBy)
+  const requestedBy = normalizeString(payload.createdBy)
+  const sessionPsychologist = await requirePsychologistSession(id)
+  const createdBy = sessionPsychologist ? 'psychologist' : 'patient'
   const groupRequested = Boolean(payload.groupRequested)
   const groupRequestNote = normalizeString(payload.groupRequestNote)
   const isGroup = Boolean(payload.isGroup) && !groupRequested
@@ -64,12 +69,22 @@ export async function POST(request: Request, { params }: Params) {
   const notificationPreference = 'email'
   const resolvedContact = patientEmail
 
-  const slots = resolveSlots(payload)
+  const rawSlots = resolveSlots(payload)
     .map((slot: any) => ({
       date: normalizeString(slot?.date),
       time: normalizeString(slot?.time),
     }))
     .filter((slot: { date: string; time: string }) => slot.date && slot.time)
+
+  const slotKeys = new Set<string>()
+  const slots = rawSlots.filter((slot: { date: string; time: string }) => {
+    const key = `${slot.date}T${slot.time}`
+    if (slotKeys.has(key)) {
+      return false
+    }
+    slotKeys.add(key)
+    return true
+  })
 
   if (!patientName || slots.length === 0) {
     return NextResponse.json(
@@ -94,6 +109,13 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
+  if (slots.some((slot: { date: string; time: string }) => !TIME_PATTERN.test(slot.time))) {
+    return NextResponse.json(
+      { error: 'Horário inválido. Use o formato HH:MM.' },
+      { status: 400 },
+    )
+  }
+
   const psychologist = await prisma.psychologist.findUnique({ where: { id } })
   if (!psychologist) {
     return NextResponse.json(
@@ -106,6 +128,13 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json(
       { error: 'Somente o psicólogo pode criar grupo.' },
       { status: 403 },
+    )
+  }
+
+  if (requestedBy === 'psychologist' && !sessionPsychologist) {
+    return NextResponse.json(
+      { error: 'Sessão do psicólogo inválida.' },
+      { status: 401 },
     )
   }
 
@@ -248,10 +277,10 @@ export async function POST(request: Request, { params }: Params) {
         }),
       )
     } catch (error: any) {
-      return NextResponse.json(
-        { error: error.message || 'Erro ao criar reunião no Google Meet.' },
-        { status: 502 },
-      )
+      console.error('[appointments:createMeetLink]', {
+        psychologistId: id,
+        error: error.message || 'Erro ao criar reunião no Google Meet.',
+      })
     }
   }
 

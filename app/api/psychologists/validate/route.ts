@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { serializePsychologist } from '@/lib/psychologists'
+import { createPsychologistSession } from '@/lib/psychologist-auth'
+import { hashSecret, isHashedSecret, verifySecret } from '@/lib/secret-crypto'
 
 export async function POST(request: Request) {
   const { email, pin } = await request.json()
@@ -39,12 +41,24 @@ export async function POST(request: Request) {
     )
   }
 
-  if (psychologist.pin !== pin) {
+  const normalizedPin = String(pin)
+  const isValidPin = await verifySecret(normalizedPin, psychologist.pin)
+
+  if (!isValidPin) {
     return NextResponse.json(
       { error: 'PIN inválido. Verifique o PIN definido no seu cadastro.' },
       { status: 401 },
     )
   }
+
+  if (psychologist.pin && !isHashedSecret(psychologist.pin)) {
+    await prisma.psychologist.update({
+      where: { id: psychologist.id },
+      data: { pin: await hashSecret(normalizedPin) },
+    })
+  }
+
+  await createPsychologistSession(psychologist.id)
 
   return NextResponse.json({ psychologist: serializePsychologist(psychologist) })
 }

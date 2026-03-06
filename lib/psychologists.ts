@@ -5,7 +5,6 @@ export interface PsychologistProfile {
   name: string
   email: string
   status: PsychologistStatus
-  pin?: string | null
   notes?: string | null
   googleEmail?: string | null
   googleCalendarId?: string | null
@@ -35,7 +34,6 @@ export const serializePsychologist = (
   name: record.name,
   email: record.email,
   status: (record.status as PsychologistStatus) ?? 'pending',
-  pin: record.pin,
   notes: record.notes,
   googleEmail: record.googleEmail,
   googleCalendarId: record.googleCalendarId,

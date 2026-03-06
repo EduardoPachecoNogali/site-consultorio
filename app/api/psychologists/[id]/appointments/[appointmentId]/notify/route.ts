@@ -4,6 +4,7 @@ import { resolveRouteParams } from '@/lib/route-params'
 import { sendMail } from '@/lib/email'
 import { createMeetLink } from '@/lib/google-meet'
 import { appConfig } from '@/lib/app-config'
+import { requirePsychologistSession } from '@/lib/psychologist-auth'
 
 interface Params {
   params?:
@@ -22,6 +23,11 @@ export async function POST(request: Request, { params }: Params) {
   const appointmentId = resolvedParams?.appointmentId
   if (!id || !appointmentId) {
     return NextResponse.json({ error: 'Consulta inválida.' }, { status: 400 })
+  }
+
+  const sessionPsychologist = await requirePsychologistSession(id)
+  if (!sessionPsychologist) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
   const payload = await request.json().catch(() => ({}))

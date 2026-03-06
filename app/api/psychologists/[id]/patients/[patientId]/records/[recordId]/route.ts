@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveRouteParams } from '@/lib/route-params'
+import { requirePsychologistSession } from '@/lib/psychologist-auth'
 
 interface Params {
   params?: { id?: string; patientId?: string; recordId?: string } | Promise<{ id?: string; patientId?: string; recordId?: string }>
@@ -19,6 +20,11 @@ export async function PATCH(request: Request, { params }: Params) {
       { error: 'Prontuário inválido.' },
       { status: 400 },
     )
+  }
+
+  const sessionPsychologist = await requirePsychologistSession(id)
+  if (!sessionPsychologist) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
   const payload = await request.json()
 
@@ -84,6 +90,11 @@ export async function DELETE(_request: Request, { params }: Params) {
       { error: 'Prontuário inválido.' },
       { status: 400 },
     )
+  }
+
+  const sessionPsychologist = await requirePsychologistSession(id)
+  if (!sessionPsychologist) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
   }
 
   const record = await prisma.medicalRecord.findFirst({

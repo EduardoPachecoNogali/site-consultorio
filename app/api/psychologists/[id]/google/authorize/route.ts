@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveRouteParams } from '@/lib/route-params'
 import { appConfig } from '@/lib/app-config'
+import { buildGoogleOAuthState, requirePsychologistSession } from '@/lib/psychologist-auth'
 
 interface Params {
   params?: { id?: string } | Promise<{ id?: string }>
@@ -29,6 +30,11 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Identificador inválido.' }, { status: 400 })
   }
 
+  const sessionPsychologist = await requirePsychologistSession(id)
+  if (!sessionPsychologist) {
+    return NextResponse.json({ error: 'Acesso negado.' }, { status: 401 })
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID
   if (!clientId) {
     return NextResponse.json(
@@ -52,9 +58,7 @@ export async function GET(request: Request, { params }: Params) {
     )
   }
 
-  const state = Buffer.from(
-    JSON.stringify({ psychologistId: id, ts: Date.now() }),
-  ).toString('base64url')
+  const state = buildGoogleOAuthState(id)
 
   const redirectUri = buildRedirectUri()
   const paramsUrl = new URLSearchParams({
